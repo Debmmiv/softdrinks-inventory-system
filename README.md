@@ -65,12 +65,3 @@ An offline-first inventory management app for a soft drinks wholesale business i
 - Every transaction gets a UUID on the device when it is created, so a retried upload is never counted twice.
 - Records are never deleted or edited. Corrections are entered as new adjustment transactions.
 
-## Team
-
-| Member | Role |
-|---|---|
-| Member 1 | Mobile app lead (Expo / React Native) |
-| Member 2 | Local database and offline logic |
-| Member 3 | Synchronization |
-| Member 4 | Backend and central database |
-| Member 5 | Reports, testing and documentation |
