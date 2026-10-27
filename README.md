@@ -65,3 +65,69 @@ An offline-first inventory management app for a soft drinks wholesale business i
 - Every transaction gets a UUID on the device when it is created, so a retried upload is never counted twice.
 - Records are never deleted or edited. Corrections are entered as new adjustment transactions.
 
+
+
+
+
+
+## Project Structure
+
+```
+softdrinks-inventory-system/
+├── README.md
+├── .gitignore
+├── backend/    (Node.js + Express API)
+└── mobile/     (Expo + React Native app)
+```
+
+## Backend Setup
+
+1. Go to the backend folder and install the packages:
+   ```bash
+   cd backend
+   npm install
+   ```
+2. Create a file named `.env` inside `backend/` (never commit this file):
+   ```dotenv
+   MONGODB_URI=mongodb+srv://<db_username>:<db_password>@<cluster-address>/inventory?appName=Cluster0
+   PORT=3000
+   JWT_SECRET=<your-own-long-random-string>
+   ```
+   Get the connection string from MongoDB Atlas: **Connect**, then **Drivers**.
+3. Allow your IP address in Atlas under **Network Access**.
+4. Start the server:
+   ```bash
+   node index.js
+   ```
+   You should see `API running` and `MongoDB connected`.
+5. Check it works: open `http://localhost:3000/health` and look for `{"ok":true}`.
+
+**Troubleshooting**
+
+| Error | Fix |
+|---|---|
+| `injected env (0)` or `uri ... undefined` | `.env` is empty, unsaved, or in the wrong folder |
+| `querySrv ECONNREFUSED` | Your network blocks DNS lookups. Keep the `dns.setServers` line at the top of `index.js` |
+| `bad auth` | Wrong database username or password in `.env` |
+
+## Progress Log
+
+| Date | Update | By |
+|---|---|---|
+| Oct 26, 2026 | Added project structure and `.gitignore` | Member |
+| Oct 26, 2026 | Set up Express backend with a `/health` check | Member |
+| Oct 26, 2026 | Connected backend to MongoDB Atlas | Member |
+
+### Status
+
+- [x] Repository and folder structure
+- [x] Backend server running
+- [x] MongoDB Atlas connected
+- [ ] Mongoose models (products, inventory, transactions, users)
+- [ ] Authentication (login and roles)
+- [ ] Sync endpoint (`POST /sync`) with validation and duplicate prevention
+- [ ] Mobile app setup (Expo, SQLite)
+- [ ] Offline recording screens
+- [ ] Sync service in the mobile app
+- [ ] Reports
+- [ ] Testing
