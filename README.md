@@ -59,6 +59,23 @@ An offline-first inventory management app for a soft drinks wholesale business i
 | NFR11 | Maintainability | The code shall be organized into separate modules (mobile app, local database, sync, backend) so each can be changed or tested independently. |
 | NFR12 | Auditability | Every transaction shall record the user, device, and time it was created. |
 
+### Screen Requirements
+
+| Screen | Description | Status / Path |
+|---|---|---|
+| Login Screen | Allows staff and owner/manager to log in using their credentials and role; authenticates locally/remotely and enforces role-based navigation and permissions (FR1, NFR7). | Planned (`mobile/src/screens/LoginScreen.tsx`) |
+| Dashboard / Home Screen | Displays current inventory summary (cases and loose bottles), device network/sync status indicator, low-stock replenishment alerts, and quick-action shortcuts for recording deliveries, releases, and adjustments (FR6, FR8, FR10, NFR1, NFR5, NFR9). | Planned (`mobile/src/screens/DashboardScreen.tsx`) |
+| Record Delivery Screen | Fast-entry form for recording incoming stock from suppliers in cases and loose bottles; automatically calculates total bottles, saves to local SQLite with a UUID, and queues for backend synchronization (FR3, FR6, FR8, FR9, NFR1, NFR5, NFR9, NFR12). | Planned (`mobile/src/screens/DeliveryScreen.tsx`) |
+| Record Release Screen | Form for recording stock released to customers in cases and bottles; validates against available inventory in real time, rejects releases exceeding stock with an alert dialog, and logs the transaction with a UUID (FR4, FR6, FR7, FR8, FR9, NFR1, NFR5, NFR9). | Planned (`mobile/src/screens/ReleaseScreen.tsx`) |
+| Stock Adjustment Screen | Form to record inventory changes due to breakage, damage, loss, or count corrections in cases and bottles; requires a mandatory reason and saves an immutable adjustment record with a UUID (FR5, FR6, FR8, FR9, NFR1, NFR5, NFR9, NFR12). | Planned (`mobile/src/screens/AdjustmentScreen.tsx`) |
+| Product Catalog Screen | Searchable and filterable list of all soft drink products showing current stock (cases and remaining bottles), bottle size, bottles per case, reorder level, and active/inactive status (FR2, FR6, FR8, FR16, NFR1). | Planned (`mobile/src/screens/ProductListScreen.tsx`) |
+| Product Management Screen | Owner-only form to add, edit, or deactivate products, configure brand names, bottle sizes, bottles per case (pack size), and set individual product reorder thresholds (FR2, FR16, NFR7). | Planned (`mobile/src/screens/ProductFormScreen.tsx`) |
+| Transaction History Screen | Read-only, immutable audit trail of all transactions (deliveries, releases, adjustments) with filters by date, type, product, and staff; displays transaction UUID, user, device ID, and timestamp (FR14, NFR1, NFR2, NFR12). | Planned (`mobile/src/screens/TransactionHistoryScreen.tsx`) |
+| Sync Queue & Status Screen | Displays network connectivity status, pending/synced/failed transaction counts, detailed failure reasons with retry triggers, and a manual sync button to push offline SQLite records to MongoDB Atlas (FR9, FR10, FR13, NFR2, NFR3, NFR4, NFR6). | Planned (`mobile/src/screens/SyncQueueScreen.tsx`) |
+| Reports & Analytics Screen | Generates reports for current stock levels, stock movement logs filtered by date range, and a replenishment list of items that have reached or fallen below their reorder level (FR15, FR16, NFR1). | Planned (`mobile/src/screens/ReportsScreen.tsx`) |
+| User Management Screen | Owner-only screen to view, create, edit, and deactivate staff and manager accounts, assign roles, and manage access permissions (FR1, FR16, NFR7). | Planned (`mobile/src/screens/UserManagementScreen.tsx`) |
+| Settings / Profile Screen | Displays logged-in user profile, role, device ID, local database diagnostics, sync preferences, and provides a secure logout function (FR1, NFR7, NFR8, NFR12). | Planned (`mobile/src/screens/SettingsScreen.tsx`) |
+
 ## Data Handling Rules
 
 - Stock is stored in bottles: `total_bottles = (cases x units_per_case) + loose bottles`. It is displayed as cases and remaining bottles.
