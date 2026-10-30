@@ -1,9 +1,9 @@
 require('dns').setServers(['8.8.8.8', '1.1.1.1']);
 require('dotenv').config();
 const mongoose = require('mongoose');
-const Product = require('./models/Product');
-const Inventory = require('./models/Inventory');
-const Transaction = require('./models/Transaction');
+const Product = require('./src/models/Product');
+const Inventory = require('./src/models/Inventory');
+const Transaction = require('./src/models/Transaction');
 
 (async () => {
   await mongoose.connect(process.env.MONGODB_URI);
