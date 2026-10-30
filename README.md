@@ -25,7 +25,7 @@ An offline-first inventory management app for a soft drinks wholesale business i
 
 | ID | Requirement |
 |---|---|
-| FR1 | The backend service shall, upon initial database initialization, parse administrator credentials from environment variables (`.env`) and seed an initial Owner/Manager account into MongoDB Atlas if no active administrative account exists. |
+| FR1 | The system shall provide a secure administrative bootstrap/injection script (CLI) to provision an initial Owner/Manager account directly into MongoDB Atlas with salted bcrypt password hashing, ensuring administrative credentials are never stored in or parsed from application environment variables (`.env`). |
 | FR2 | The mobile application shall authenticate user credentials against the backend API within 2 seconds when online, returning a signed JWT token containing the user ID, username, and assigned role (`staff` or `owner/manager`). |
 | FR3 | The mobile application shall cache hashed user credentials and roles securely in local SQLite upon each successful online login, allowing users to authenticate and access the app offline with zero network connectivity. |
 | FR4 | The mobile application shall enforce role-based navigation guards upon login, granting `staff` access strictly to operational screens (Dashboard, Delivery, Release, Adjustment, Sync Queue, Catalog, Settings) while restricting management screens (Product Management, User Management, Staff Enrollment, Reports) exclusively to `owner/manager`. |
@@ -116,7 +116,7 @@ The system defines two primary roles: **Staff** and **Owner / Manager** (FR4, NF
 | **Product Management** | Add, edit, and deactivate products | ❌ | ✅ | FR8, FR9, Product Management Screen |
 | | Configure brand, bottle size, and pack size (bottles/case) | ❌ | ✅ | FR8, FR9, Product Management Screen |
 | | Set and update reorder thresholds per product | ❌ | ✅ | FR10, Product Management Screen |
-| **User Administration** | Predefine initial users and credentials via `.env` file | ❌ | ✅ | FR1, Environment Config |
+| **User Administration** | Inject initial Owner/Manager account via secure CLI script | ❌ | ✅ | FR1, Admin Injection Script |
 | | Enroll newly hired staff/managers into the business | ❌ | ✅ | FR6, Staff Enrollment Screen |
 | | View, edit, and deactivate staff & manager accounts | ❌ | ✅ | FR7, User Management Screen |
 | | Assign roles and manage access permissions | ❌ | ✅ | FR4, FR6, FR7, User Management Screen |
