@@ -90,18 +90,19 @@ softdrinks-inventory-system/
 │   │   │   └── types.ts                    # RootStackParamList & navigation types
 │   │   │
 │   │   ├── screens/                        # Application Screens
-│   │   │   ├── AdjustmentScreen.tsx        # FR5: Record stock adjustments & reasons
-│   │   │   ├── DashboardScreen.tsx         # FR6, FR8: Overview of stock, sync status
-│   │   │   ├── DeliveryScreen.tsx          # FR3: Record supplier deliveries
-│   │   │   ├── LoginScreen.tsx             # FR1: Role-based authentication
-│   │   │   ├── ProductFormScreen.tsx       # FR2, FR16: Add/edit product & reorder levels
-│   │   │   ├── ProductListScreen.tsx       # FR2, FR6: Searchable product catalog
-│   │   │   ├── ReleaseScreen.tsx           # FR4, FR7: Record customer release & stock checks
-│   │   │   ├── ReportsScreen.tsx           # FR15: Stock levels, movements, replenishment
+│   │   │   ├── AdjustmentScreen.tsx        # FR6: Record stock adjustments & reasons
+│   │   │   ├── DashboardScreen.tsx         # FR7, FR9: Overview of stock, sync status
+│   │   │   ├── DeliveryScreen.tsx          # FR4: Record supplier deliveries
+│   │   │   ├── LoginScreen.tsx             # FR1, FR2: Role-based authentication & env credentials
+│   │   │   ├── ProductFormScreen.tsx       # FR3, FR17: Add/edit product & reorder levels
+│   │   │   ├── ProductListScreen.tsx       # FR3, FR7: Searchable product catalog
+│   │   │   ├── ReleaseScreen.tsx           # FR5, FR8: Record customer release & stock checks
+│   │   │   ├── ReportsScreen.tsx           # FR16: Stock levels, movements, replenishment
 │   │   │   ├── SettingsScreen.tsx          # App settings, device ID, logout
-│   │   │   ├── SyncQueueScreen.tsx         # FR9, FR13: View pending/failed items & retry
-│   │   │   ├── TransactionHistoryScreen.tsx # FR14: Immutable audit log
-│   │   │   └── UserManagementScreen.tsx    # FR16: Owner manage staff accounts
+│   │   │   ├── StaffEnrollmentScreen.tsx   # FR17: Enroll newly hired staff accounts
+│   │   │   ├── SyncQueueScreen.tsx         # FR10, FR14: View pending/failed items & retry
+│   │   │   ├── TransactionHistoryScreen.tsx # FR15: Immutable audit log
+│   │   │   └── UserManagementScreen.tsx    # FR17: Owner manage staff accounts
 │   │   │
 │   │   ├── services/                       # Business & Background Logic
 │   │   │   ├── networkService.ts           # NetInfo event listeners & status checks
