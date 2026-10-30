@@ -90,19 +90,19 @@ softdrinks-inventory-system/
 │   │   │   └── types.ts                    # RootStackParamList & navigation types
 │   │   │
 │   │   ├── screens/                        # Application Screens
-│   │   │   ├── AdjustmentScreen.tsx        # FR6: Record stock adjustments & reasons
-│   │   │   ├── DashboardScreen.tsx         # FR7, FR9: Overview of stock, sync status
-│   │   │   ├── DeliveryScreen.tsx          # FR4: Record supplier deliveries
-│   │   │   ├── LoginScreen.tsx             # FR1, FR2: Role-based authentication & env credentials
-│   │   │   ├── ProductFormScreen.tsx       # FR3, FR17: Add/edit product & reorder levels
-│   │   │   ├── ProductListScreen.tsx       # FR3, FR7: Searchable product catalog
-│   │   │   ├── ReleaseScreen.tsx           # FR5, FR8: Record customer release & stock checks
-│   │   │   ├── ReportsScreen.tsx           # FR16: Stock levels, movements, replenishment
-│   │   │   ├── SettingsScreen.tsx          # App settings, device ID, logout
-│   │   │   ├── StaffEnrollmentScreen.tsx   # FR17: Enroll newly hired staff accounts
-│   │   │   ├── SyncQueueScreen.tsx         # FR10, FR14: View pending/failed items & retry
-│   │   │   ├── TransactionHistoryScreen.tsx # FR15: Immutable audit log
-│   │   │   └── UserManagementScreen.tsx    # FR17: Owner manage staff accounts
+│   │   │   ├── AdjustmentScreen.tsx        # FR14: Record stock adjustments & reasons
+│   │   │   ├── DashboardScreen.tsx         # FR15, FR16, FR26, FR27: Overview of stock, sync status
+│   │   │   ├── DeliveryScreen.tsx          # FR11: Record supplier deliveries
+│   │   │   ├── LoginScreen.tsx             # FR1, FR2, FR3, FR4: Role-based auth & offline cache
+│   │   │   ├── ProductFormScreen.tsx       # FR8, FR9, FR10: Add/edit product & reorder levels
+│   │   │   ├── ProductListScreen.tsx       # FR8, FR15, FR27: Searchable product catalog
+│   │   │   ├── ReleaseScreen.tsx           # FR12, FR13: Record customer release & stock checks
+│   │   │   ├── ReportsScreen.tsx           # FR25, FR26: Stock levels, movements, replenishment
+│   │   │   ├── SettingsScreen.tsx          # FR5: App settings, device ID, logout
+│   │   │   ├── StaffEnrollmentScreen.tsx   # FR6: Enroll newly hired staff accounts
+│   │   │   ├── SyncQueueScreen.tsx         # FR17, FR18, FR19, FR22: View pending/failed items & retry
+│   │   │   ├── TransactionHistoryScreen.tsx # FR24: Immutable audit log
+│   │   │   └── UserManagementScreen.tsx    # FR7: Owner manage staff accounts
 │   │   │
 │   │   ├── services/                       # Business & Background Logic
 │   │   │   ├── networkService.ts           # NetInfo event listeners & status checks
