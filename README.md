@@ -92,6 +92,24 @@ flowchart TD
    - If central stock levels fall below the defined reorder threshold, the owner's dashboard immediately highlights a replenishment alert with the exact deficit bottle count.
    - The owner can audit complete, tamper-proof transaction histories and export movement summaries filtered by date and transaction type.
 
+## Core Assumptions & System Boundaries (Non-Goals)
+
+To preserve architectural clarity and focus on warehouse stock movement, the system operates under the following explicit project boundaries:
+
+1. **Pure Volume-Based Stock Tracking**:
+   - The system tracks physical product units (cases and loose bottles).
+   - Point-of-Sale (POS) capabilities, customer retail pricing, margins, credit ledgers (*utang*), and payment gateway processing are explicitly **out of scope**.
+2. **Empty Bottle & Crate (*Embalaje*) Scope**:
+   - Returnable Glass Bottle (RGB) shell/crate and empty bottle deposit accounting is **out of scope**.
+   - The system strictly tracks saleable beverage inventory.
+3. **Single-Depot Wholesale Deployment**:
+   - Designed for a single wholesale distribution warehouse in Gusa, Cagayan de Oro.
+   - Multi-warehouse routing, inter-branch logistics transfers, and multi-tenant isolation are non-goals for this version.
+4. **Android-First Handheld Deployment**:
+   - Target clients are warehouse-floor Android devices running Android 10 (API level 29) through Android 14 (API level 34).
+5. **Initial Online Setup Requirement (Device Hydration)**:
+   - A newly installed device must be connected online for its initial login to authenticate the user and hydrate the local SQLite database with active product definitions before offline operation begins.
+
 ## Requirements
 
 ### Functional Requirements (FR)
@@ -106,7 +124,7 @@ flowchart TD
 | FR6 | The system shall restrict account creation exclusively to the Owner/Manager, disabling public self-registration; only an authenticated Owner/Manager can enroll new staff and provision their initial credentials (full name, unique username, initial password of at least 6 characters, and assigned role) into MongoDB Atlas and local SQLite. |
 | FR7 | The system shall allow an owner/manager to view the complete user list and toggle the active status of any staff account (`is_active = false`), immediately revoking their login permissions while preserving all historical transactions associated with their user ID. |
 | FR8 | The system shall allow an owner/manager to add a new soft drink product with mandatory attributes: brand name, product name, bottle size in ml/L, units per case (integer >= 1), and an initial reorder alert threshold (integer >= 0). |
-| FR9 | The system shall allow an owner/manager to update product specifications (brand name, bottle size, units per case, reorder threshold) or deactivate a product (`is_active = false`), preventing deactivated products from appearing in transaction dropdowns while preserving historical transaction records. |
+| FR9 | The system shall allow an owner/manager to update product specifications (brand name, bottle size, reorder threshold) or deactivate a product (`is_active = false`), preventing deactivated products from appearing in transaction dropdowns while preserving historical transaction records. To prevent historical inventory audit corruption, the `units_per_case` pack size attribute shall remain immutable once transactions have been recorded for that product. |
 | FR10 | The system shall allow an owner/manager to define and update a minimum stock reorder threshold (in total bottles) for each individual product. |
 | FR11 | The system shall record incoming supplier deliveries by accepting case quantity (integer >= 0) and loose bottle quantity (integer >= 0), validating that `(cases + loose_bottles) > 0`, calculating the total added bottles, and incrementing local product stock. |
 | FR12 | The system shall record customer release transactions by accepting case quantity (integer >= 0) and loose bottle quantity (integer >= 0), validating that `(cases + loose_bottles) > 0`, deducting total bottles from local stock, and assigning a unique UUID. |
@@ -126,6 +144,9 @@ flowchart TD
 | FR26 | The system shall generate a replenishment report listing all active products whose `total_bottles <= reorder_level_bottles`, displaying the deficit quantity needed to reach safe stock levels. |
 | FR27 | The system shall provide a real-time search and filter feature on the Product Catalog and Dashboard screens, filtering products by brand name or product name with search results updating within 300 milliseconds of user input. |
 | FR28 | The system shall allow staff to log in using their initial administrator-created credentials and provide a self-service password change capability (via Settings/Profile) allowing staff to change their password at will upon validating their current password. |
+| FR29 | The system shall allow an authenticated Owner/Manager to reset any staff member's password to a new temporary credential via the User Management screen to resolve forgotten password lockouts. |
+| FR30 | The system shall allow staff to record an optional Customer / Destination identifier or Receipt number during stock release, and an optional Supplier Waybill / Delivery Receipt (DR) reference during delivery for wholesale audit tracing. |
+| FR31 | Upon establishing a network connection, the mobile application shall execute a downstream synchronization query (`GET /api/sync/downstream`) to fetch newly added/updated products and authoritative centralized stock balances from MongoDB Atlas, reconciling multi-device changes in local SQLite without duplicating local transactions. |
 
 ### Non-Functional Requirements (NFR)
 
@@ -143,24 +164,25 @@ flowchart TD
 | NFR10 | Compatibility | The mobile client shall install, launch in under 3 seconds, and render all screens without layout breakage or crashes on Android devices running Android 10 (API level 29) through Android 14 (API level 34) across standard screen sizes (5.0 to 6.8 inches). |
 | NFR11 | Maintainability | The application code shall be organized into decoupled modules (mobile UI, SQLite repositories, sync engine, Express controllers, Mongoose models) maintaining automated unit and integration test coverage for calculation and sync logic. |
 | NFR12 | Auditability | Every transaction record shall capture immutable audit metadata—including initiating `user_id`, `device_id` (UUID), transaction type, timestamp in ISO 8601 UTC format, and sync status—persisted immutably across SQLite and MongoDB. |
+| NFR13 | Concurrency Resilience | In the event of multi-device concurrent offline releases exceeding total warehouse stock, the backend API shall persist all valid offline transactions, compute the deficit balance, and flag the transaction record with discrepancy status `CONCURRENCY_DEFICIT`, triggering an immediate visual alert on the Owner Dashboard for physical audit reconciliation. |
 
 ### Screen Requirements
 
 | Screen | Description | Status / Path |
 |---|---|---|
 | Login Screen | Allows staff and owner/manager to log in using their credentials and role; authenticates online with backend JWT or offline with cached SQLite credentials, and enforces role-based navigation and permissions (FR1, FR2, FR3, FR4, NFR7). | Planned (`mobile/src/screens/LoginScreen.tsx`) |
-| Dashboard / Home Screen | Displays current inventory summary (cases and loose bottles), device network/sync status indicator, low-stock replenishment alerts, real-time product search, and quick-action shortcuts for recording transactions (FR15, FR16, FR18, FR26, FR27, NFR1, NFR5, NFR9). | Planned (`mobile/src/screens/DashboardScreen.tsx`) |
-| Record Delivery Screen | Fast-entry form for recording incoming stock from suppliers in cases and loose bottles; automatically calculates total bottles, saves to local SQLite with a UUID, and queues for backend synchronization (FR11, FR15, FR16, FR17, NFR1, NFR5, NFR9, NFR12). | Planned (`mobile/src/screens/DeliveryScreen.tsx`) |
-| Record Release Screen | Form for recording stock released to customers in cases and bottles; validates against available inventory in real time, rejects releases exceeding stock with an alert dialog, and logs the transaction with a UUID (FR12, FR13, FR15, FR16, FR17, NFR1, NFR5, NFR9). | Planned (`mobile/src/screens/ReleaseScreen.tsx`) |
+| Dashboard / Home Screen | Displays current inventory summary (cases and loose bottles), device network/sync status indicator, low-stock replenishment alerts, concurrency deficit warnings, real-time product search, and quick-action shortcuts for recording transactions (FR15, FR16, FR18, FR26, FR27, NFR1, NFR5, NFR9, NFR13). | Planned (`mobile/src/screens/DashboardScreen.tsx`) |
+| Record Delivery Screen | Fast-entry form for recording incoming stock from suppliers in cases and loose bottles with optional Supplier DR / Waybill reference; automatically calculates total bottles, saves to local SQLite with a UUID, and queues for backend synchronization (FR11, FR15, FR16, FR17, FR30, NFR1, NFR5, NFR9, NFR12). | Planned (`mobile/src/screens/DeliveryScreen.tsx`) |
+| Record Release Screen | Form for recording stock released to customers in cases and bottles with optional Customer / Destination or Receipt reference; validates against available inventory in real time, rejects releases exceeding stock with an alert dialog, and logs the transaction with a UUID (FR12, FR13, FR15, FR16, FR17, FR30, NFR1, NFR5, NFR9). | Planned (`mobile/src/screens/ReleaseScreen.tsx`) |
 | Stock Adjustment Screen | Form to record inventory changes due to breakage, damage, loss, or count corrections in cases and bottles; requires a mandatory reason and saves an immutable adjustment record with a UUID (FR14, FR15, FR16, FR17, NFR1, NFR5, NFR9, NFR12). | Planned (`mobile/src/screens/AdjustmentScreen.tsx`) |
 | Product Catalog Screen | Searchable and filterable list of all soft drink products showing current stock (cases and remaining bottles), bottle size, bottles per case, reorder level, and active/inactive status (FR8, FR9, FR10, FR15, FR16, FR27, NFR1). | Planned (`mobile/src/screens/ProductListScreen.tsx`) |
-| Product Management Screen | Owner-only form to add, edit, or deactivate products, configure brand names, bottle sizes, bottles per case (pack size), and set individual product reorder thresholds (FR8, FR9, FR10, NFR7). | Planned (`mobile/src/screens/ProductFormScreen.tsx`) |
-| Transaction History Screen | Read-only, immutable audit trail of all transactions (deliveries, releases, adjustments) with filters by date, type, product, and staff; displays transaction UUID, user, device ID, and timestamp (FR24, NFR1, NFR2, NFR12). | Planned (`mobile/src/screens/TransactionHistoryScreen.tsx`) |
-| Sync Queue & Status Screen | Displays network connectivity status, pending/synced/failed transaction counts, detailed failure reasons with retry triggers, and a manual sync button to push offline SQLite records to MongoDB Atlas (FR17, FR18, FR19, FR22, FR23, NFR2, NFR3, NFR4, NFR6). | Planned (`mobile/src/screens/SyncQueueScreen.tsx`) |
+| Product Management Screen | Owner-only form to add, edit, or deactivate products, configure brand names, bottle sizes, immutable bottles per case (pack size), and set individual product reorder thresholds (FR8, FR9, FR10, NFR7). | Planned (`mobile/src/screens/ProductFormScreen.tsx`) |
+| Transaction History Screen | Read-only, immutable audit trail of all transactions (deliveries, releases, adjustments) with filters by date, type, product, and staff; displays transaction UUID, user, device ID, customer/supplier reference tag, and timestamp (FR24, FR30, NFR1, NFR2, NFR12). | Planned (`mobile/src/screens/TransactionHistoryScreen.tsx`) |
+| Sync Queue & Status Screen | Displays network connectivity status, pending/synced/failed transaction counts, downstream reconciliation triggers, detailed failure reasons with retry triggers, and a manual sync button to push offline SQLite records to MongoDB Atlas (FR17, FR18, FR19, FR22, FR23, FR31, NFR2, NFR3, NFR4, NFR6). | Planned (`mobile/src/screens/SyncQueueScreen.tsx`) |
 | Reports & Analytics Screen | Generates reports for current stock levels, stock movement logs filtered by date range, and a replenishment list of items that have reached or fallen below their reorder level (FR25, FR26, NFR1). | Planned (`mobile/src/screens/ReportsScreen.tsx`) |
-| User Management Screen | Owner-only screen to view, search, and deactivate existing accounts, as well as navigate to the staff enrollment screen (FR1, FR4, FR7, NFR7). | Planned (`mobile/src/screens/UserManagementScreen.tsx`) |
+| User Management Screen | Owner-only screen to view, search, deactivate existing accounts, reset forgotten staff passwords to new temporary credentials, as well as navigate to the staff enrollment screen (FR1, FR4, FR7, FR29, NFR7). | Planned (`mobile/src/screens/UserManagementScreen.tsx`) |
 | Staff Enrollment Screen | Owner-only screen/form to enroll and register a newly hired staff member or manager into the business; captures full name, username, initial temporary password, and role assignment (`staff` or `owner/manager`) (FR6, NFR7). | Planned (`mobile/src/screens/StaffEnrollmentScreen.tsx`) |
-| Settings / Profile Screen | Displays logged-in user profile, role, device ID, local database diagnostics, sync preferences, and provides a secure logout function (FR2, FR5, NFR7, NFR8, NFR12). | Planned (`mobile/src/screens/SettingsScreen.tsx`) |
+| Settings / Profile Screen | Displays logged-in user profile, role, device ID, local database diagnostics, sync preferences, provides self-service password changes, and provides a secure logout function (FR2, FR5, FR28, NFR7, NFR8, NFR12). | Planned (`mobile/src/screens/SettingsScreen.tsx`) |
 
 ## Data Handling Rules
 
