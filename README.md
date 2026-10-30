@@ -11,13 +11,86 @@ An offline-first inventory management app for a soft drinks wholesale business i
 | Backend API | Node.js and Express |
 | Central database | MongoDB Atlas |
 
-## How It Works
+## System Flow & How It Works
 
-1. A user records a delivery, release, or adjustment in the mobile app.
-2. The transaction is saved in SQLite with a unique ID (UUID) and a `PENDING` status.
-3. When internet is available, the sync service sends pending transactions to the backend.
-4. The backend validates each transaction, rejects duplicates, and updates MongoDB Atlas.
-5. After confirmation, the app marks the transaction as `SYNCED` (or `FAILED` with a reason).
+### Operational Architecture
+
+```mermaid
+flowchart TD
+    subgraph S1 ["1. Setup & Staff Provisioning (Owner Only)"]
+        CLI["Admin CLI Script (One-time injection)"] -->|"Injects hashed credentials"| AtlasDB[("MongoDB Atlas Central DB")]
+        Owner["Owner / Manager"] -->|"Logs into Mobile App"| OwnerApp["Owner Dashboard"]
+        OwnerApp -->|"Sets Products & Pack Sizes (e.g. 24 btls/case)"| CatalogSetup["Product Catalog Configured"]
+        OwnerApp -->|"Enrolls Staff & Sets Initial Password"| StaffCreated["Staff Account Provisioned"]
+    end
+
+    subgraph S2 ["2. Warehouse Floor Operations (Staff)"]
+        Staff["Warehouse Staff"] -->|"Logs In (Cached in SQLite)"| StaffApp["Staff Dashboard (Admin tabs hidden)"]
+        StaffApp -.->|"Optional: Change Password at will"| PwdChange["Staff Password Updated"]
+
+        StaffApp --> OpChoice{"Select Warehouse Task"}
+        
+        OpChoice -->|"Supplier Delivery"| Delivery["Enter Cases + Loose Bottles"]
+        Delivery --> AddStock["Calculate Total Bottles & Add to Stock"]
+
+        OpChoice -->|"Customer Release"| Release["Enter Requested Cases + Bottles"]
+        Release --> CheckStock{"Available Stock >= Requested?"}
+        CheckStock -- "No: Insufficient" --> Block["Transaction Blocked & Warning Shown"]
+        CheckStock -- "Yes: Sufficient" --> DeductStock["Deduct Total Bottles from Stock"]
+
+        OpChoice -->|"Stock Adjustment"| Adj["Select Reason (Breakage / Damage / Count)"]
+        Adj --> UpdateStock["Apply +/- Bottle Adjustment to Stock"]
+    end
+
+    subgraph S3 ["3. Offline-First Storage & Auto-Sync"]
+        AddStock --> SaveSQLite["Save Transaction to SQLite with UUIDv4 and PENDING"]
+        DeductStock --> SaveSQLite
+        UpdateStock --> SaveSQLite
+
+        SaveSQLite --> NetCheck{"Internet Connected?"}
+        NetCheck -- "No (Offline)" --> OfflineStore["Queue safely in SQLite (App fully operational)"]
+        OfflineStore -.->|"Connection returns or 'Sync Now' tapped"| NetCheck
+
+        NetCheck -- "Yes (Online)" --> PushBatch["Push FIFO Batch to Node.js Backend"]
+        PushBatch --> Idempotent{"Backend Check: UUID exists in Atlas?"}
+        Idempotent -- "Duplicate" --> Skip["Reject Duplicate (No double-counting)"]
+        Idempotent -- "New Record" --> CommitAtlas["Save to Atlas & Update Central Stock"]
+        
+        CommitAtlas --> Ack["HTTP 200 OK Response"]
+        Skip --> Ack
+        Ack --> MarkSynced["Update SQLite Record Status to SYNCED"]
+    end
+
+    subgraph S4 ["4. Managerial Oversight (Owner Only)"]
+        CommitAtlas -.-> ReorderCheck{"Central Stock <= Reorder Level?"}
+        ReorderCheck -- "Yes" --> ReplenishAlert["Trigger Replenishment Alert on Owner Screen"]
+        OwnerApp --> ViewReports["Audit Transaction History & Daily Reports"]
+    end
+```
+
+### End-to-End Operational Walkthrough
+
+1. **Initial Provisioning & Catalog Setup (Admin CLI)**:
+   - The business owner runs a secure CLI injection script (`npm run seed:admin`) to provision the initial Owner/Manager account directly into MongoDB Atlas with salted bcrypt hashing.
+   - The owner logs into the mobile app and configures product packaging specifications (brand name, bottle size in ml/L, units per case, and minimum reorder alert thresholds).
+2. **Staff Onboarding & Role Restriction (Owner)**:
+   - The owner navigates to **Staff Enrollment** to provision new warehouse employees with a unique username and initial password. Public registration is strictly disabled.
+   - Upon initial login, staff credentials are encrypted and cached in local SQLite for offline access. Staff can change their password at will under **Settings**.
+   - Strict Role-Based Access Control (RBAC) hides all management interfaces (Product Management, User Management, Staff Enrollment, and Reports) from the staff interface.
+3. **Recording Warehouse Transactions (Staff - 100% Offline Capable)**:
+   - When a delivery arrives from a supplier, staff enter the case count and loose bottle count (e.g., 50 cases and 12 loose bottles of Coca-Cola 1.5L). The app automatically calculates total bottle count based on units per case.
+   - When releasing stock to a retail customer, the app validates requested quantities against available SQLite stock in real time. If requested stock exceeds inventory, the transaction is immediately blocked to prevent negative stock.
+   - In case of bottle breakage or transport damage, staff record a stock adjustment selecting a mandatory reason (`breakage`, `damage`, `loss`, or `count_correction`).
+4. **Local SQLite Persistence & Immutable Queue**:
+   - Each transaction generates a unique UUIDv4, commits immediately to local SQLite, and is stored in the sync queue table marked as `PENDING`.
+   - The warehouse workflow never stutters, lags, or blocks if the mobile device loses internet connectivity or WiFi coverage.
+5. **Background Sync & Idempotent Processing**:
+   - The app monitors connectivity via NetInfo. As soon as the device detects an active internet connection (or when the user taps **Sync Now**), the queue transmits pending transactions in FIFO batches to the Node.js API.
+   - The backend checks each transaction UUID against MongoDB Atlas to enforce strict idempotency—preventing duplicate stock counts if a connection dropped mid-request.
+   - On confirmation (HTTP 200), the app marks local records as `SYNCED`. If network fails mid-sync, items remain `FAILED` or `PENDING` with full retry support.
+6. **Owner Alerts & Inventory Reconciliation**:
+   - If central stock levels fall below the defined reorder threshold, the owner's dashboard immediately highlights a replenishment alert with the exact deficit bottle count.
+   - The owner can audit complete, tamper-proof transaction histories and export movement summaries filtered by date and transaction type.
 
 ## Requirements
 
@@ -28,9 +101,9 @@ An offline-first inventory management app for a soft drinks wholesale business i
 | FR1 | The system shall provide a secure administrative bootstrap/injection script (CLI) to provision an initial Owner/Manager account directly into MongoDB Atlas with salted bcrypt password hashing, ensuring administrative credentials are never stored in or parsed from application environment variables (`.env`). |
 | FR2 | The mobile application shall authenticate user credentials against the backend API within 2 seconds when online, returning a signed JWT token containing the user ID, username, and assigned role (`staff` or `owner/manager`). |
 | FR3 | The mobile application shall cache hashed user credentials and roles securely in local SQLite upon each successful online login, allowing users to authenticate and access the app offline with zero network connectivity. |
-| FR4 | The mobile application shall enforce role-based navigation guards upon login, granting `staff` access strictly to operational screens (Dashboard, Delivery, Release, Adjustment, Sync Queue, Catalog, Settings) while restricting management screens (Product Management, User Management, Staff Enrollment, Reports) exclusively to `owner/manager`. |
+| FR4 | The system shall enforce strict Role-Based Access Control (RBAC) across both mobile navigation and backend API endpoints: staff users shall be granted access strictly to operational screens (Dashboard, Delivery, Release, Adjustment, Sync Queue, Catalog, Settings), while administrative screens (Product Management, User Management, Staff Enrollment, Reports) and their navigation elements shall be completely hidden and inaccessible to staff. |
 | FR5 | The mobile application shall provide a secure logout function that clears local session tokens and cached in-memory state within 500 milliseconds, redirecting the user to the Login screen and requiring re-authentication. |
-| FR6 | The system shall allow an owner/manager to enroll newly hired employees via the Staff Enrollment screen by inputting full name, unique username, initial password (minimum 6 characters), and role (`staff` or `owner/manager`), saving the account to MongoDB Atlas and local SQLite. |
+| FR6 | The system shall restrict account creation exclusively to the Owner/Manager, disabling public self-registration; only an authenticated Owner/Manager can enroll new staff and provision their initial credentials (full name, unique username, initial password of at least 6 characters, and assigned role) into MongoDB Atlas and local SQLite. |
 | FR7 | The system shall allow an owner/manager to view the complete user list and toggle the active status of any staff account (`is_active = false`), immediately revoking their login permissions while preserving all historical transactions associated with their user ID. |
 | FR8 | The system shall allow an owner/manager to add a new soft drink product with mandatory attributes: brand name, product name, bottle size in ml/L, units per case (integer >= 1), and an initial reorder alert threshold (integer >= 0). |
 | FR9 | The system shall allow an owner/manager to update product specifications (brand name, bottle size, units per case, reorder threshold) or deactivate a product (`is_active = false`), preventing deactivated products from appearing in transaction dropdowns while preserving historical transaction records. |
@@ -52,6 +125,7 @@ An offline-first inventory management app for a soft drinks wholesale business i
 | FR25 | The system shall generate inventory reports filterable by date range and transaction type, displaying cumulative stock received, released, and adjusted per product over the selected period. |
 | FR26 | The system shall generate a replenishment report listing all active products whose `total_bottles <= reorder_level_bottles`, displaying the deficit quantity needed to reach safe stock levels. |
 | FR27 | The system shall provide a real-time search and filter feature on the Product Catalog and Dashboard screens, filtering products by brand name or product name with search results updating within 300 milliseconds of user input. |
+| FR28 | The system shall allow staff to log in using their initial administrator-created credentials and provide a self-service password change capability (via Settings/Profile) allowing staff to change their password at will upon validating their current password. |
 
 ### Non-Functional Requirements (NFR)
 
@@ -102,6 +176,7 @@ The system defines two primary roles: **Staff** and **Owner / Manager** (FR4, NF
 |---|---|:---:|:---:|---|
 | **Authentication & Profile** | Log in with credentials and role (online/offline) | ✅ | ✅ | FR2, FR3, Login Screen |
 | | View profile, device ID, and diagnostics | ✅ | ✅ | Settings Screen |
+| | Change personal password at will | ✅ | ✅ | FR28, Settings Screen |
 | | Log out and clear session tokens | ✅ | ✅ | FR5, Settings Screen |
 | **Dashboard & Catalog** | View dashboard summary & stock alerts | ✅ | ✅ | FR15, FR16, FR26, Dashboard Screen |
 | | Search and filter product catalog & pack sizes | ✅ | ✅ | FR15, FR27, Product Catalog Screen |
@@ -111,12 +186,12 @@ The system defines two primary roles: **Staff** and **Owner / Manager** (FR4, NF
 | **Sync & Offline Queue** | View sync queue status (pending / synced / failed) | ✅ | ✅ | FR17, FR22, Sync Queue Screen |
 | | Trigger manual sync of offline transactions | ✅ | ✅ | FR18, FR19, Sync Queue Screen |
 | **Audit & History** | View immutable transaction history & audit logs | ✅ | ✅ | FR24, Transaction History Screen |
-| **Reports & Analytics** | View current stock level & movement reports by date | ❌ | ✅ | FR25, Reports Screen |
-| | View replenishment lists for low-stock items | ❌ | ✅ | FR26, Reports Screen |
-| **Product Management** | Add, edit, and deactivate products | ❌ | ✅ | FR8, FR9, Product Management Screen |
-| | Configure brand, bottle size, and pack size (bottles/case) | ❌ | ✅ | FR8, FR9, Product Management Screen |
-| | Set and update reorder thresholds per product | ❌ | ✅ | FR10, Product Management Screen |
-| **User Administration** | Inject initial Owner/Manager account via secure CLI script | ❌ | ✅ | FR1, Admin Injection Script |
-| | Enroll newly hired staff/managers into the business | ❌ | ✅ | FR6, Staff Enrollment Screen |
-| | View, edit, and deactivate staff & manager accounts | ❌ | ✅ | FR7, User Management Screen |
-| | Assign roles and manage access permissions | ❌ | ✅ | FR4, FR6, FR7, User Management Screen |
+| **Reports & Analytics** | View current stock level & movement reports by date | ❌ *(Hidden)* | ✅ | FR4, FR25, Reports Screen |
+| | View replenishment lists for low-stock items | ❌ *(Hidden)* | ✅ | FR4, FR26, Reports Screen |
+| **Product Management** | Add, edit, and deactivate products | ❌ *(Hidden)* | ✅ | FR4, FR8, FR9, Product Management Screen |
+| | Configure brand, bottle size, and pack size (bottles/case) | ❌ *(Hidden)* | ✅ | FR4, FR8, FR9, Product Management Screen |
+| | Set and update reorder thresholds per product | ❌ *(Hidden)* | ✅ | FR4, FR10, Product Management Screen |
+| **User Administration** | Inject initial Owner/Manager account via secure CLI script | ❌ *(Hidden)* | ✅ | FR1, Admin Injection Script |
+| | Exclusively enroll newly hired staff & assign initial credentials (no public signup) | ❌ *(Hidden)* | ✅ | FR4, FR6, Staff Enrollment Screen |
+| | View, edit, and deactivate staff & manager accounts | ❌ *(Hidden)* | ✅ | FR4, FR7, User Management Screen |
+| | Assign roles and manage RBAC access permissions | ❌ *(Hidden)* | ✅ | FR4, FR6, FR7, User Management Screen |

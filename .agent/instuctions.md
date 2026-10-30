@@ -98,8 +98,8 @@ softdrinks-inventory-system/
 │   │   │   ├── ProductListScreen.tsx       # FR8, FR15, FR27: Searchable product catalog
 │   │   │   ├── ReleaseScreen.tsx           # FR12, FR13: Record customer release & stock checks
 │   │   │   ├── ReportsScreen.tsx           # FR25, FR26: Stock levels, movements, replenishment
-│   │   │   ├── SettingsScreen.tsx          # FR5: App settings, device ID, logout
-│   │   │   ├── StaffEnrollmentScreen.tsx   # FR6: Enroll newly hired staff accounts
+│   │   │   ├── SettingsScreen.tsx          # FR5, FR28: App settings, change password, device ID, logout
+│   │   │   ├── StaffEnrollmentScreen.tsx   # FR6: Owner-only enrollment of staff accounts
 │   │   │   ├── SyncQueueScreen.tsx         # FR17, FR18, FR19, FR22: View pending/failed items & retry
 │   │   │   ├── TransactionHistoryScreen.tsx # FR24: Immutable audit log
 │   │   │   └── UserManagementScreen.tsx    # FR7: Owner manage staff accounts
@@ -148,6 +148,6 @@ softdrinks-inventory-system/
 - Deconstructs bottle totals into cases and remaining loose bottles for UI presentation.
 
 ### 4. `mobile/src/navigation/`
-- Enforces role-based view isolation:
-  - **Staff Role**: Access only to Dashboard, Record Delivery, Record Release, Stock Adjustment, and Sync Queue.
-  - **Owner Role**: Full access including Product Management, User Management, and Reports.
+- Enforces strict role-based access control (RBAC) and view isolation:
+  - **Staff Role**: Access restricted strictly to Dashboard, Record Delivery, Record Release, Stock Adjustment, Sync Queue, Catalog, and Settings (with self-service password change). All administrative menus and screens are strictly hidden from staff.
+  - **Owner Role**: Full access including Product Management, User Management, Staff Enrollment, and Reports.
