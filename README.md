@@ -205,8 +205,9 @@ The system defines two primary roles: **Staff** and **Owner / Manager** (FR4, NF
 | **Inventory Transactions** | Record deliveries from suppliers (cases & bottles) | ✅ | ✅ | FR11, Delivery Screen |
 | | Record releases to customers with real-time stock check | ✅ | ✅ | FR12, FR13, Release Screen |
 | | Record stock adjustments with required reason | ✅ | ✅ | FR14, Adjustment Screen |
+| | Add optional Customer/Supplier reference metadata | ✅ | ✅ | FR30, Delivery & Release Screens |
 | **Sync & Offline Queue** | View sync queue status (pending / synced / failed) | ✅ | ✅ | FR17, FR22, Sync Queue Screen |
-| | Trigger manual sync of offline transactions | ✅ | ✅ | FR18, FR19, Sync Queue Screen |
+| | Trigger manual sync & downstream reconciliation | ✅ | ✅ | FR18, FR19, FR31, Sync Queue Screen |
 | **Audit & History** | View immutable transaction history & audit logs | ✅ | ✅ | FR24, Transaction History Screen |
 | **Reports & Analytics** | View current stock level & movement reports by date | ❌ *(Hidden)* | ✅ | FR4, FR25, Reports Screen |
 | | View replenishment lists for low-stock items | ❌ *(Hidden)* | ✅ | FR4, FR26, Reports Screen |
@@ -216,4 +217,119 @@ The system defines two primary roles: **Staff** and **Owner / Manager** (FR4, NF
 | **User Administration** | Inject initial Owner/Manager account via secure CLI script | ❌ *(Hidden)* | ✅ | FR1, Admin Injection Script |
 | | Exclusively enroll newly hired staff & assign initial credentials (no public signup) | ❌ *(Hidden)* | ✅ | FR4, FR6, Staff Enrollment Screen |
 | | View, edit, and deactivate staff & manager accounts | ❌ *(Hidden)* | ✅ | FR4, FR7, User Management Screen |
+| | Reset staff password to new temporary credential | ❌ *(Hidden)* | ✅ | FR4, FR29, User Management Screen |
 | | Assign roles and manage RBAC access permissions | ❌ *(Hidden)* | ✅ | FR4, FR6, FR7, User Management Screen |
+
+## Database Schema Architecture
+
+The system maintains strict schema parity between the central MongoDB Atlas cluster and the local mobile SQLite database:
+
+### 1. MongoDB Atlas (Central Cloud Store)
+
+- **`users` Collection**:
+  - `_id`: ObjectId
+  - `username`: String (unique, indexed)
+  - `password_hash`: String (salted bcrypt hash)
+  - `full_name`: String
+  - `role`: String (`staff` | `owner/manager`)
+  - `is_active`: Boolean (default `true`)
+  - `created_at`: Date (UTC)
+- **`products` Collection**:
+  - `_id`: ObjectId
+  - `brand_name`: String (e.g., "Coca-Cola", "Pepsi")
+  - `product_name`: String (e.g., "Coke Original", "Sprite")
+  - `bottle_size`: String (e.g., "1.5L", "500ml", "12oz")
+  - `units_per_case`: Number (immutable integer >= 1)
+  - `reorder_threshold_bottles`: Number (integer >= 0)
+  - `total_stock_bottles`: Number (authoritative centralized stock balance)
+  - `is_active`: Boolean (default `true`)
+  - `updated_at`: Date (UTC)
+- **`transactions` Collection**:
+  - `_id`: ObjectId
+  - `uuid`: String (UUIDv4, unique index for idempotency)
+  - `product_id`: ObjectId (reference to `products`)
+  - `user_id`: ObjectId (reference to `users`)
+  - `device_id`: String (UUIDv4 of physical mobile client)
+  - `transaction_type`: String (`DELIVERY` | `RELEASE` | `ADJUSTMENT`)
+  - `cases`: Number (integer >= 0)
+  - `loose_bottles`: Number (integer >= 0)
+  - `total_bottles_delta`: Number (positive or negative total bottle change)
+  - `resulting_stock_bottles`: Number (snapshot of stock at transaction time)
+  - `reason`: String (mandatory for adjustments: `breakage`, `damage`, `loss`, `count_correction`)
+  - `remarks`: String (optional text notes)
+  - `reference_tag`: String (optional: Customer name, Receipt #, or Supplier DR #)
+  - `discrepancy_flag`: String (optional: `CONCURRENCY_DEFICIT`)
+  - `created_at`: Date (UTC ISO 8601)
+
+### 2. SQLite (Local Handheld Store)
+
+- **`users_cache`**: `(id TEXT PRIMARY KEY, username TEXT UNIQUE, password_hash TEXT, full_name TEXT, role TEXT, is_active INTEGER)`
+- **`products`**: `(id TEXT PRIMARY KEY, brand_name TEXT, product_name TEXT, bottle_size TEXT, units_per_case INTEGER, reorder_threshold_bottles INTEGER, local_stock_bottles INTEGER, is_active INTEGER, updated_at TEXT)`
+- **`transactions`**: `(uuid TEXT PRIMARY KEY, product_id TEXT, user_id TEXT, device_id TEXT, transaction_type TEXT, cases INTEGER, loose_bottles INTEGER, total_bottles_delta INTEGER, resulting_stock_bottles INTEGER, reason TEXT, remarks TEXT, reference_tag TEXT, created_at TEXT)`
+- **`sync_queue`**: `(queue_id INTEGER PRIMARY KEY AUTOINCREMENT, transaction_uuid TEXT UNIQUE, status TEXT, retry_count INTEGER DEFAULT 0, error_message TEXT, queued_at TEXT, synced_at TEXT)`
+
+## REST API Endpoint Specification
+
+All endpoints under `/api` communicate in JSON (`Content-Type: application/json`). Protected routes require a Bearer token (`Authorization: Bearer <jwt_token>`).
+
+| Method | Endpoint | Access | Purpose |
+|---|---|:---:|---|
+| `POST` | `/api/auth/login` | Public | Authenticates credentials and returns signed JWT token with user ID and role. |
+| `POST` | `/api/auth/change-password` | Authenticated | Allows staff or owner to change their password upon validating their current password. |
+| `POST` | `/api/auth/admin/reset-password` | Owner Only | Allows owner to reset a staff account password to a new temporary credential. |
+| `POST` | `/api/auth/admin/enroll` | Owner Only | Provisions a new staff or manager account with initial credentials. |
+| `GET` | `/api/auth/users` | Owner Only | Retrieves list of all users and their active/inactive status. |
+| `PATCH` | `/api/auth/users/:id/status` | Owner Only | Toggles active status (`is_active = false/true`) for account revocation. |
+| `GET` | `/api/products` | Authenticated | Fetches active soft drinks product catalog. |
+| `POST` | `/api/products` | Owner Only | Creates a new product with brand, packaging, and reorder levels. |
+| `PATCH` | `/api/products/:id` | Owner Only | Updates product specifications or deactivates product. |
+| `POST` | `/api/sync/batch` | Authenticated | Receives array of offline transactions, checks UUID idempotency, and updates central stock. |
+| `GET` | `/api/sync/downstream` | Authenticated | Returns updated catalog definitions and authoritative stock levels since a timestamp. |
+| `GET` | `/api/reports/summary` | Owner Only | Generates inventory movements and totals filtered by date range and type. |
+| `GET` | `/api/reports/replenishment` | Owner Only | Returns products where `total_stock <= reorder_threshold` and calculated deficit bottles. |
+| `GET` | `/health` | Public | Health check returning `{ ok: true }` and database connectivity status. |
+
+## Developer Quickstart & Installation
+
+Follow these steps to set up the development environment from scratch:
+
+### Prerequisites
+- **Node.js**: v18.x or v20.x LTS installed
+- **MongoDB Atlas**: An active MongoDB Atlas connection string URI
+- **Expo CLI / Mobile Client**: Node packages installed; Android device with Expo Go or Android Studio emulator (API 29+)
+
+### 1. Backend Setup
+1. Open terminal and navigate to `backend/`:
+   ```bash
+   cd backend
+   npm install
+   ```
+2. Configure your `backend/.env` file:
+   ```env
+   PORT=5000
+   MONGODB_URI=your_mongodb_atlas_connection_string
+   JWT_SECRET=your_jwt_secret_key
+   ```
+3. Inject the Initial Owner/Manager Account via secure CLI:
+   ```bash
+   npm run seed:admin
+   # Follow interactive terminal prompt to set owner username and secure password
+   ```
+4. Start the backend service:
+   ```bash
+   npm run dev    # Starts with nodemon (or: node index.js)
+   ```
+
+### 2. Mobile App Setup
+1. Open a second terminal and navigate to `mobile/`:
+   ```bash
+   cd mobile
+   npm install
+   ```
+2. Configure mobile client API base URL:
+   Update `mobile/src/api/client.ts` with your local development machine IP address (e.g., `http://192.168.1.100:5000/api`).
+3. Start the Expo development server:
+   ```bash
+   npx expo start
+   ```
+4. Press `a` to run on connected Android device/emulator, or scan the QR code with the Expo Go Android app.

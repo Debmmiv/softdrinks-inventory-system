@@ -92,17 +92,17 @@ softdrinks-inventory-system/
 │   │   ├── screens/                        # Application Screens
 │   │   │   ├── AdjustmentScreen.tsx        # FR14: Record stock adjustments & reasons
 │   │   │   ├── DashboardScreen.tsx         # FR15, FR16, FR26, FR27: Overview of stock, sync status
-│   │   │   ├── DeliveryScreen.tsx          # FR11: Record supplier deliveries
+│   │   │   ├── DeliveryScreen.tsx          # FR11, FR30: Record supplier deliveries & DR references
 │   │   │   ├── LoginScreen.tsx             # FR1, FR2, FR3, FR4: Role-based auth & offline cache
 │   │   │   ├── ProductFormScreen.tsx       # FR8, FR9, FR10: Add/edit product & reorder levels
 │   │   │   ├── ProductListScreen.tsx       # FR8, FR15, FR27: Searchable product catalog
-│   │   │   ├── ReleaseScreen.tsx           # FR12, FR13: Record customer release & stock checks
+│   │   │   ├── ReleaseScreen.tsx           # FR12, FR13, FR30: Customer release, stock checks & refs
 │   │   │   ├── ReportsScreen.tsx           # FR25, FR26: Stock levels, movements, replenishment
 │   │   │   ├── SettingsScreen.tsx          # FR5, FR28: App settings, change password, device ID, logout
 │   │   │   ├── StaffEnrollmentScreen.tsx   # FR6: Owner-only enrollment of staff accounts
-│   │   │   ├── SyncQueueScreen.tsx         # FR17, FR18, FR19, FR22: View pending/failed items & retry
-│   │   │   ├── TransactionHistoryScreen.tsx # FR24: Immutable audit log
-│   │   │   └── UserManagementScreen.tsx    # FR7: Owner manage staff accounts
+│   │   │   ├── SyncQueueScreen.tsx         # FR17, FR18, FR19, FR22, FR31: Queue status, retry & downstream sync
+│   │   │   ├── TransactionHistoryScreen.tsx # FR24, FR30: Immutable audit log & customer/supplier tags
+│   │   │   └── UserManagementScreen.tsx    # FR4, FR7, FR29: Owner manage accounts & password reset
 │   │   │
 │   │   ├── services/                       # Business & Background Logic
 │   │   │   ├── networkService.ts           # NetInfo event listeners & status checks
