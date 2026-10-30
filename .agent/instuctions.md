@@ -90,18 +90,19 @@ softdrinks-inventory-system/
 │   │   │   └── types.ts                    # RootStackParamList & navigation types
 │   │   │
 │   │   ├── screens/                        # Application Screens
-│   │   │   ├── AdjustmentScreen.tsx        # FR5: Record stock adjustments & reasons
-│   │   │   ├── DashboardScreen.tsx         # FR6, FR8: Overview of stock, sync status
-│   │   │   ├── DeliveryScreen.tsx          # FR3: Record supplier deliveries
-│   │   │   ├── LoginScreen.tsx             # FR1: Role-based authentication
-│   │   │   ├── ProductFormScreen.tsx       # FR2, FR16: Add/edit product & reorder levels
-│   │   │   ├── ProductListScreen.tsx       # FR2, FR6: Searchable product catalog
-│   │   │   ├── ReleaseScreen.tsx           # FR4, FR7: Record customer release & stock checks
-│   │   │   ├── ReportsScreen.tsx           # FR15: Stock levels, movements, replenishment
-│   │   │   ├── SettingsScreen.tsx          # App settings, device ID, logout
-│   │   │   ├── SyncQueueScreen.tsx         # FR9, FR13: View pending/failed items & retry
-│   │   │   ├── TransactionHistoryScreen.tsx # FR14: Immutable audit log
-│   │   │   └── UserManagementScreen.tsx    # FR16: Owner manage staff accounts
+│   │   │   ├── AdjustmentScreen.tsx        # FR14: Record stock adjustments & reasons
+│   │   │   ├── DashboardScreen.tsx         # FR15, FR16, FR26, FR27: Overview of stock, sync status
+│   │   │   ├── DeliveryScreen.tsx          # FR11, FR30: Record supplier deliveries & DR references
+│   │   │   ├── LoginScreen.tsx             # FR1, FR2, FR3, FR4: Role-based auth & offline cache
+│   │   │   ├── ProductFormScreen.tsx       # FR8, FR9, FR10: Add/edit product & reorder levels
+│   │   │   ├── ProductListScreen.tsx       # FR8, FR15, FR27: Searchable product catalog
+│   │   │   ├── ReleaseScreen.tsx           # FR12, FR13, FR30: Customer release, stock checks & refs
+│   │   │   ├── ReportsScreen.tsx           # FR25, FR26: Stock levels, movements, replenishment
+│   │   │   ├── SettingsScreen.tsx          # FR5, FR28: App settings, change password, device ID, logout
+│   │   │   ├── StaffEnrollmentScreen.tsx   # FR6: Owner-only enrollment of staff accounts
+│   │   │   ├── SyncQueueScreen.tsx         # FR17, FR18, FR19, FR22, FR31: Queue status, retry & downstream sync
+│   │   │   ├── TransactionHistoryScreen.tsx # FR24, FR30: Immutable audit log & customer/supplier tags
+│   │   │   └── UserManagementScreen.tsx    # FR4, FR7, FR29: Owner manage accounts & password reset
 │   │   │
 │   │   ├── services/                       # Business & Background Logic
 │   │   │   ├── networkService.ts           # NetInfo event listeners & status checks
@@ -147,6 +148,6 @@ softdrinks-inventory-system/
 - Deconstructs bottle totals into cases and remaining loose bottles for UI presentation.
 
 ### 4. `mobile/src/navigation/`
-- Enforces role-based view isolation:
-  - **Staff Role**: Access only to Dashboard, Record Delivery, Record Release, Stock Adjustment, and Sync Queue.
-  - **Owner Role**: Full access including Product Management, User Management, and Reports.
+- Enforces strict role-based access control (RBAC) and view isolation:
+  - **Staff Role**: Access restricted strictly to Dashboard, Record Delivery, Record Release, Stock Adjustment, Sync Queue, Catalog, and Settings (with self-service password change). All administrative menus and screens are strictly hidden from staff.
+  - **Owner Role**: Full access including Product Management, User Management, Staff Enrollment, and Reports.
