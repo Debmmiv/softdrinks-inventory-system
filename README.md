@@ -1,15 +1,15 @@
 # Offline-First Soft Drinks Inventory System
 
-An offline-first inventory management app for a soft drinks wholesale business in Gusa. Staff can record deliveries, releases, and stock adjustments in cases and individual bottles, even without internet. Pending transactions are synchronized to a central database when a connection returns.
+An offline-first inventory management app for a soft drinks wholesale business in Gusa. Staff can record deliveries, releases, and stock adjustments in cases and individual bottles, even without internet. Pending transactions are synchronized to a central database when a connection returns. Built as a full-stack Expo application with Expo Router and integrated Node.js API Routes.
 
 ## Tech Stack
 
 | Layer | Technology |
 |---|---|
-| Mobile app | Expo and React Native (Android) |
-| Local database | SQLite |
-| Backend API | Node.js and Express |
-| Central database | MongoDB Atlas |
+| Full-Stack Mobile & API Routes | Expo and React Native (Expo Router with API Routes) |
+| Local database | SQLite (`expo-sqlite` with WAL mode) |
+| Backend API Runtime | Node.js Server via Expo Router API Routes (`src/app/api/*+api.ts`) |
+| Central database | MongoDB Atlas (via Mongoose) |
 
 ## System Flow & How It Works
 
@@ -51,8 +51,8 @@ flowchart TD
         NetCheck -- "No (Offline)" --> OfflineStore["Queue safely in SQLite (App fully operational)"]
         OfflineStore -.->|"Connection returns or 'Sync Now' tapped"| NetCheck
 
-        NetCheck -- "Yes (Online)" --> PushBatch["Push FIFO Batch to Node.js Backend"]
-        PushBatch --> Idempotent{"Backend Check: UUID exists in Atlas?"}
+        NetCheck -- "Yes (Online)" --> PushBatch["Push FIFO Batch to Expo API Routes"]
+        PushBatch --> Idempotent{"API Check: UUID exists in Atlas?"}
         Idempotent -- "Duplicate" --> Skip["Reject Duplicate (No double-counting)"]
         Idempotent -- "New Record" --> CommitAtlas["Save to Atlas & Update Central Stock"]
         
@@ -71,7 +71,7 @@ flowchart TD
 ### End-to-End Operational Walkthrough
 
 1. **Initial Provisioning & Catalog Setup (Admin CLI)**:
-   - The business owner runs a secure CLI injection script (`npm run seed:admin`) to provision the initial Owner/Manager account directly into MongoDB Atlas with salted bcrypt hashing.
+   - The business owner runs a secure CLI injection script (`npm run seed:admin` inside `mobile/`) to provision the initial Owner/Manager account directly into MongoDB Atlas with salted bcrypt hashing.
    - The owner logs into the mobile app and configures product packaging specifications (brand name, bottle size in ml/L, units per case, and minimum reorder alert thresholds).
 2. **Staff Onboarding & Role Restriction (Owner)**:
    - The owner navigates to **Staff Enrollment** to provision new warehouse employees with a unique username and initial password. Public registration is strictly disabled.
@@ -85,8 +85,8 @@ flowchart TD
    - Each transaction generates a unique UUIDv4, commits immediately to local SQLite, and is stored in the sync queue table marked as `PENDING`.
    - The warehouse workflow never stutters, lags, or blocks if the mobile device loses internet connectivity or WiFi coverage.
 5. **Background Sync & Idempotent Processing**:
-   - The app monitors connectivity via NetInfo. As soon as the device detects an active internet connection (or when the user taps **Sync Now**), the queue transmits pending transactions in FIFO batches to the Node.js API.
-   - The backend checks each transaction UUID against MongoDB Atlas to enforce strict idempotency—preventing duplicate stock counts if a connection dropped mid-request.
+   - The app monitors connectivity via NetInfo. As soon as the device detects an active internet connection (or when the user taps **Sync Now**), the queue transmits pending transactions in FIFO batches to the Expo API routes (`/api/sync/batch`).
+   - The API checks each transaction UUID against MongoDB Atlas to enforce strict idempotency—preventing duplicate stock counts if a connection dropped mid-request.
    - On confirmation (HTTP 200), the app marks local records as `SYNCED`. If network fails mid-sync, items remain `FAILED` or `PENDING` with full retry support.
 6. **Owner Alerts & Inventory Reconciliation**:
    - If central stock levels fall below the defined reorder threshold, the owner's dashboard immediately highlights a replenishment alert with the exact deficit bottle count.
@@ -117,7 +117,7 @@ To preserve architectural clarity and focus on warehouse stock movement, the sys
 | ID | Requirement |
 |---|---|
 | FR1 | The system shall provide a secure administrative bootstrap/injection script (CLI) to provision an initial Owner/Manager account directly into MongoDB Atlas with salted bcrypt password hashing, ensuring administrative credentials are never stored in or parsed from application environment variables (`.env`). |
-| FR2 | The mobile application shall authenticate user credentials against the backend API within 2 seconds when online, returning a signed JWT token containing the user ID, username, and assigned role (`staff` or `owner/manager`). |
+| FR2 | The mobile application shall authenticate user credentials against the Expo backend API routes within 2 seconds when online, returning a signed JWT token containing the user ID, username, and assigned role (`staff` or `owner/manager`). |
 | FR3 | The mobile application shall cache hashed user credentials and roles securely in local SQLite upon each successful online login, allowing users to authenticate and access the app offline with zero network connectivity. |
 | FR4 | The system shall enforce strict Role-Based Access Control (RBAC) across both mobile navigation and backend API endpoints: staff users shall be granted access strictly to operational screens (Dashboard, Delivery, Release, Adjustment, Sync Queue, Catalog, Settings), while administrative screens (Product Management, User Management, Staff Enrollment, Reports) and their navigation elements shall be completely hidden and inaccessible to staff. |
 | FR5 | The mobile application shall provide a secure logout function that clears local session tokens and cached in-memory state within 500 milliseconds, redirecting the user to the Login screen and requiring re-authentication. |
@@ -133,7 +133,7 @@ To preserve architectural clarity and focus on warehouse stock movement, the sys
 | FR15 | The system shall compute single-bottle inventory totals using `total_bottles = (cases * units_per_case) + loose_bottles` and format all stock displays throughout the app as `X cases and Y bottles` where `cases = floor(total_bottles / units_per_case)` and `remaining_bottles = total_bottles % units_per_case`. |
 | FR16 | The mobile application shall execute all read, write, and stock calculation queries against the local SQLite database first, enabling full operational functionality without an active network connection. |
 | FR17 | The system shall assign an immutable UUIDv4 to every created transaction and immediately insert the record into a local sync queue table with status `PENDING` and a UTC creation timestamp. |
-| FR18 | The system shall detect network availability changes via NetInfo and automatically transmit pending transactions in FIFO order to the backend API within 5 seconds of network restoration. |
+| FR18 | The system shall detect network availability changes via NetInfo and automatically transmit pending transactions in FIFO order to the backend API routes within 5 seconds of network restoration. |
 | FR19 | The system shall provide a manual 'Sync Now' action on the Sync Queue screen allowing the user to initiate an immediate synchronization of all `PENDING` and `FAILED` transactions with visual progress feedback. |
 | FR20 | The backend API shall validate transaction payloads against schema rules and enforce idempotency by querying incoming UUIDs against MongoDB Atlas; existing UUIDs shall be rejected as duplicates with HTTP 200/409 without double-counting stock. |
 | FR21 | Upon successful validation of non-duplicate transactions, the backend API shall persist the transaction record in MongoDB Atlas and atomically update the centralized product inventory. |
@@ -162,27 +162,27 @@ To preserve architectural clarity and focus on warehouse stock movement, the sys
 | NFR8 | Security | All network communication between the mobile app and backend API shall be encrypted using TLS 1.3 (HTTPS), and no central database connection URIs or administrative API secrets shall be hardcoded or bundled inside the mobile client APK. |
 | NFR9 | Usability | The delivery and release forms shall allow a trained user to complete an entry in 4 or fewer taps/inputs within 15 seconds, providing numeric keypad defaults and dual input fields for cases and bottles. |
 | NFR10 | Compatibility | The mobile client shall install, launch in under 3 seconds, and render all screens without layout breakage or crashes on Android devices running Android 10 (API level 29) through Android 14 (API level 34) across standard screen sizes (5.0 to 6.8 inches). |
-| NFR11 | Maintainability | The application code shall be organized into decoupled modules (mobile UI, SQLite repositories, sync engine, Express controllers, Mongoose models) maintaining automated unit and integration test coverage for calculation and sync logic. |
+| NFR11 | Maintainability | The application code shall be organized into decoupled modules (mobile UI, SQLite repositories, sync engine, Expo Router API routes, Mongoose models) maintaining automated unit and integration test coverage for calculation and sync logic. |
 | NFR12 | Auditability | Every transaction record shall capture immutable audit metadata—including initiating `user_id`, `device_id` (UUID), transaction type, timestamp in ISO 8601 UTC format, and sync status—persisted immutably across SQLite and MongoDB. |
 | NFR13 | Concurrency Resilience | In the event of multi-device concurrent offline releases exceeding total warehouse stock, the backend API shall persist all valid offline transactions, compute the deficit balance, and flag the transaction record with discrepancy status `CONCURRENCY_DEFICIT`, triggering an immediate visual alert on the Owner Dashboard for physical audit reconciliation. |
 
-### Screen Requirements
+### Screen Requirements (Expo Router)
 
-| Screen | Description | Status / Path |
+| Screen | Description | Expo Router Route |
 |---|---|---|
-| Login Screen | Allows staff and owner/manager to log in using their credentials and role; authenticates online with backend JWT or offline with cached SQLite credentials, and enforces role-based navigation and permissions (FR1, FR2, FR3, FR4, NFR7). | Planned (`mobile/src/screens/LoginScreen.tsx`) |
-| Dashboard / Home Screen | Displays current inventory summary (cases and loose bottles), device network/sync status indicator, low-stock replenishment alerts, concurrency deficit warnings, real-time product search, and quick-action shortcuts for recording transactions (FR15, FR16, FR18, FR26, FR27, NFR1, NFR5, NFR9, NFR13). | Planned (`mobile/src/screens/DashboardScreen.tsx`) |
-| Record Delivery Screen | Fast-entry form for recording incoming stock from suppliers in cases and loose bottles with optional Supplier DR / Waybill reference; automatically calculates total bottles, saves to local SQLite with a UUID, and queues for backend synchronization (FR11, FR15, FR16, FR17, FR30, NFR1, NFR5, NFR9, NFR12). | Planned (`mobile/src/screens/DeliveryScreen.tsx`) |
-| Record Release Screen | Form for recording stock released to customers in cases and bottles with optional Customer / Destination or Receipt reference; validates against available inventory in real time, rejects releases exceeding stock with an alert dialog, and logs the transaction with a UUID (FR12, FR13, FR15, FR16, FR17, FR30, NFR1, NFR5, NFR9). | Planned (`mobile/src/screens/ReleaseScreen.tsx`) |
-| Stock Adjustment Screen | Form to record inventory changes due to breakage, damage, loss, or count corrections in cases and bottles; requires a mandatory reason and saves an immutable adjustment record with a UUID (FR14, FR15, FR16, FR17, NFR1, NFR5, NFR9, NFR12). | Planned (`mobile/src/screens/AdjustmentScreen.tsx`) |
-| Product Catalog Screen | Searchable and filterable list of all soft drink products showing current stock (cases and remaining bottles), bottle size, bottles per case, reorder level, and active/inactive status (FR8, FR9, FR10, FR15, FR16, FR27, NFR1). | Planned (`mobile/src/screens/ProductListScreen.tsx`) |
-| Product Management Screen | Owner-only form to add, edit, or deactivate products, configure brand names, bottle sizes, immutable bottles per case (pack size), and set individual product reorder thresholds (FR8, FR9, FR10, NFR7). | Planned (`mobile/src/screens/ProductFormScreen.tsx`) |
-| Transaction History Screen | Read-only, immutable audit trail of all transactions (deliveries, releases, adjustments) with filters by date, type, product, and staff; displays transaction UUID, user, device ID, customer/supplier reference tag, and timestamp (FR24, FR30, NFR1, NFR2, NFR12). | Planned (`mobile/src/screens/TransactionHistoryScreen.tsx`) |
-| Sync Queue & Status Screen | Displays network connectivity status, pending/synced/failed transaction counts, downstream reconciliation triggers, detailed failure reasons with retry triggers, and a manual sync button to push offline SQLite records to MongoDB Atlas (FR17, FR18, FR19, FR22, FR23, FR31, NFR2, NFR3, NFR4, NFR6). | Planned (`mobile/src/screens/SyncQueueScreen.tsx`) |
-| Reports & Analytics Screen | Generates reports for current stock levels, stock movement logs filtered by date range, and a replenishment list of items that have reached or fallen below their reorder level (FR25, FR26, NFR1). | Planned (`mobile/src/screens/ReportsScreen.tsx`) |
-| User Management Screen | Owner-only screen to view, search, deactivate existing accounts, reset forgotten staff passwords to new temporary credentials, as well as navigate to the staff enrollment screen (FR1, FR4, FR7, FR29, NFR7). | Planned (`mobile/src/screens/UserManagementScreen.tsx`) |
-| Staff Enrollment Screen | Owner-only screen/form to enroll and register a newly hired staff member or manager into the business; captures full name, username, initial temporary password, and role assignment (`staff` or `owner/manager`) (FR6, NFR7). | Planned (`mobile/src/screens/StaffEnrollmentScreen.tsx`) |
-| Settings / Profile Screen | Displays logged-in user profile, role, device ID, local database diagnostics, sync preferences, provides self-service password changes, and provides a secure logout function (FR2, FR5, FR28, NFR7, NFR8, NFR12). | Planned (`mobile/src/screens/SettingsScreen.tsx`) |
+| Login Screen | Allows staff and owner/manager to log in using their credentials and role; authenticates online with backend JWT or offline with cached SQLite credentials, and enforces role-based navigation and permissions (FR1, FR2, FR3, FR4, NFR7). | `mobile/src/app/(auth)/login.tsx` |
+| Dashboard / Home Screen | Displays current inventory summary (cases and loose bottles), device network/sync status indicator, low-stock replenishment alerts, concurrency deficit warnings, real-time product search, and quick-action shortcuts for recording transactions (FR15, FR16, FR18, FR26, FR27, NFR1, NFR5, NFR9, NFR13). | `mobile/src/app/(tabs)/index.tsx` |
+| Record Delivery Screen | Fast-entry form for recording incoming stock from suppliers in cases and loose bottles with optional Supplier DR / Waybill reference; automatically calculates total bottles, saves to local SQLite with a UUID, and queues for backend synchronization (FR11, FR15, FR16, FR17, FR30, NFR1, NFR5, NFR9, NFR12). | `mobile/src/app/(tabs)/delivery.tsx` |
+| Record Release Screen | Form for recording stock released to customers in cases and bottles with optional Customer / Destination or Receipt reference; validates against available inventory in real time, rejects releases exceeding stock with an alert dialog, and logs the transaction with a UUID (FR12, FR13, FR15, FR16, FR17, FR30, NFR1, NFR5, NFR9). | `mobile/src/app/(tabs)/release.tsx` |
+| Stock Adjustment Screen | Form to record inventory changes due to breakage, damage, loss, or count corrections in cases and bottles; requires a mandatory reason and saves an immutable adjustment record with a UUID (FR14, FR15, FR16, FR17, NFR1, NFR5, NFR9, NFR12). | `mobile/src/app/(tabs)/adjustment.tsx` |
+| Product Catalog Screen | Searchable and filterable list of all soft drink products showing current stock (cases and remaining bottles), bottle size, bottles per case, reorder level, and active/inactive status (FR8, FR9, FR10, FR15, FR16, FR27, NFR1). | `mobile/src/app/(tabs)/catalog.tsx` |
+| Transaction History Screen | Read-only, immutable audit trail of all transactions (deliveries, releases, adjustments) with filters by date, type, product, and staff; displays transaction UUID, user, device ID, customer/supplier reference tag, and timestamp (FR24, FR30, NFR1, NFR2, NFR12). | `mobile/src/app/(tabs)/history.tsx` |
+| Sync Queue & Status Screen | Displays network connectivity status, pending/synced/failed transaction counts, downstream reconciliation triggers, detailed failure reasons with retry triggers, and a manual sync button to push offline SQLite records to MongoDB Atlas (FR17, FR18, FR19, FR22, FR23, FR31, NFR2, NFR3, NFR4, NFR6). | `mobile/src/app/(tabs)/sync.tsx` |
+| Settings / Profile Screen | Displays logged-in user profile, role, device ID, local database diagnostics, sync preferences, provides self-service password changes, and provides a secure logout function (FR2, FR5, FR28, NFR7, NFR8, NFR12). | `mobile/src/app/(tabs)/settings.tsx` |
+| Product Management Screen | Owner-only form to add, edit, or deactivate products, configure brand names, bottle sizes, immutable bottles per case (pack size), and set individual product reorder thresholds (FR8, FR9, FR10, NFR7). | `mobile/src/app/(owner)/products/index.tsx`, `[id].tsx` |
+| Reports & Analytics Screen | Owner-only screen to view stock levels, stock movement logs filtered by date range, and a replenishment list of items that have reached or fallen below their reorder level (FR25, FR26, NFR1). | `mobile/src/app/(owner)/reports.tsx` |
+| User Management Screen | Owner-only screen to view, search, deactivate existing accounts, reset forgotten staff passwords to new temporary credentials, as well as navigate to the staff enrollment screen (FR1, FR4, FR7, FR29, NFR7). | `mobile/src/app/(owner)/users/index.tsx` |
+| Staff Enrollment Screen | Owner-only screen/form to enroll and register a newly hired staff member or manager into the business; captures full name, username, initial temporary password, and role assignment (`staff` or `owner/manager`) (FR6, NFR7). | `mobile/src/app/(owner)/users/enroll.tsx` |
 
 ## Data Handling Rules
 
@@ -268,68 +268,62 @@ The system maintains strict schema parity between the central MongoDB Atlas clus
 - **`transactions`**: `(uuid TEXT PRIMARY KEY, product_id TEXT, user_id TEXT, device_id TEXT, transaction_type TEXT, cases INTEGER, loose_bottles INTEGER, total_bottles_delta INTEGER, resulting_stock_bottles INTEGER, reason TEXT, remarks TEXT, reference_tag TEXT, created_at TEXT)`
 - **`sync_queue`**: `(queue_id INTEGER PRIMARY KEY AUTOINCREMENT, transaction_uuid TEXT UNIQUE, status TEXT, retry_count INTEGER DEFAULT 0, error_message TEXT, queued_at TEXT, synced_at TEXT)`
 
-## REST API Endpoint Specification
+## REST API Endpoint Specification (Expo Router API Routes)
 
-All endpoints under `/api` communicate in JSON (`Content-Type: application/json`). Protected routes require a Bearer token (`Authorization: Bearer <jwt_token>`).
+All endpoints communicate in JSON (`Content-Type: application/json`). Implemented as Expo Router API Routes under `mobile/src/app/api/*+api.ts`. Protected routes require a Bearer token (`Authorization: Bearer <jwt_token>`).
 
-| Method | Endpoint | Access | Purpose |
-|---|---|:---:|---|
-| `POST` | `/api/auth/login` | Public | Authenticates credentials and returns signed JWT token with user ID and role. |
-| `POST` | `/api/auth/change-password` | Authenticated | Allows staff or owner to change their password upon validating their current password. |
-| `POST` | `/api/auth/admin/reset-password` | Owner Only | Allows owner to reset a staff account password to a new temporary credential. |
-| `POST` | `/api/auth/admin/enroll` | Owner Only | Provisions a new staff or manager account with initial credentials. |
-| `GET` | `/api/auth/users` | Owner Only | Retrieves list of all users and their active/inactive status. |
-| `PATCH` | `/api/auth/users/:id/status` | Owner Only | Toggles active status (`is_active = false/true`) for account revocation. |
-| `GET` | `/api/products` | Authenticated | Fetches active soft drinks product catalog. |
-| `POST` | `/api/products` | Owner Only | Creates a new product with brand, packaging, and reorder levels. |
-| `PATCH` | `/api/products/:id` | Owner Only | Updates product specifications or deactivates product. |
-| `POST` | `/api/sync/batch` | Authenticated | Receives array of offline transactions, checks UUID idempotency, and updates central stock. |
-| `GET` | `/api/sync/downstream` | Authenticated | Returns updated catalog definitions and authoritative stock levels since a timestamp. |
-| `GET` | `/api/reports/summary` | Owner Only | Generates inventory movements and totals filtered by date range and type. |
-| `GET` | `/api/reports/replenishment` | Owner Only | Returns products where `total_stock <= reorder_threshold` and calculated deficit bottles. |
-| `GET` | `/health` | Public | Health check returning `{ ok: true }` and database connectivity status. |
+| Method | Endpoint | Handler File | Access | Purpose |
+|---|---|---|:---:|---|
+| `POST` | `/api/auth/login` | `src/app/api/auth/login+api.ts` | Public | Authenticates credentials and returns signed JWT token with user ID and role. |
+| `POST` | `/api/auth/change-password` | `src/app/api/auth/change-password+api.ts` | Authenticated | Allows staff or owner to change their password upon validating their current password. |
+| `POST` | `/api/auth/admin/reset-password` | `src/app/api/auth/admin/reset-password+api.ts` | Owner Only | Allows owner to reset a staff account password to a new temporary credential. |
+| `POST` | `/api/auth/admin/enroll` | `src/app/api/auth/admin/enroll+api.ts` | Owner Only | Provisions a new staff or manager account with initial credentials. |
+| `GET` | `/api/auth/users` | `src/app/api/auth/users/index+api.ts` | Owner Only | Retrieves list of all users and their active/inactive status. |
+| `PATCH` | `/api/auth/users/:id/status` | `src/app/api/auth/users/[id]/status+api.ts` | Owner Only | Toggles active status (`is_active = false/true`) for account revocation. |
+| `GET` | `/api/products` | `src/app/api/products/index+api.ts` | Authenticated | Fetches active soft drinks product catalog. |
+| `POST` | `/api/products` | `src/app/api/products/index+api.ts` | Owner Only | Creates a new product with brand, packaging, and reorder levels. |
+| `PATCH` | `/api/products/:id` | `src/app/api/products/[id]+api.ts` | Owner Only | Updates product specifications or deactivates product. |
+| `POST` | `/api/sync/batch` | `src/app/api/sync/batch+api.ts` | Authenticated | Receives array of offline transactions, checks UUID idempotency, and updates central stock. |
+| `GET` | `/api/sync/downstream` | `src/app/api/sync/downstream+api.ts` | Authenticated | Returns updated catalog definitions and authoritative stock levels since a timestamp. |
+| `GET` | `/api/reports/summary` | `src/app/api/reports/summary+api.ts` | Owner Only | Generates inventory movements and totals filtered by date range and type. |
+| `GET` | `/api/reports/replenishment` | `src/app/api/reports/replenishment+api.ts` | Owner Only | Returns products where `total_stock <= reorder_threshold` and calculated deficit bottles. |
+| `GET` | `/api/health` | `src/app/api/health+api.ts` | Public | Health check returning `{ ok: true }` and database connectivity status. |
 
 ## Developer Quickstart & Installation
 
-Follow these steps to set up the development environment from scratch:
+All client code, offline database logic, and API routes reside within the single `mobile/` project.
 
 ### Prerequisites
 - **Node.js**: v18.x or v20.x LTS installed
 - **MongoDB Atlas**: An active MongoDB Atlas connection string URI
 - **Expo CLI / Mobile Client**: Node packages installed; Android device with Expo Go or Android Studio emulator (API 29+)
 
-### 1. Backend Setup
-1. Open terminal and navigate to `backend/`:
+### Setup Instructions
+
+1. Open a terminal and navigate to `mobile/`:
    ```bash
-   cd backend
+   cd mobile
    npm install
    ```
-2. Configure your `backend/.env` file:
+
+2. Configure environment variables in `mobile/.env`:
    ```env
-   PORT=5000
    MONGODB_URI=your_mongodb_atlas_connection_string
    JWT_SECRET=your_jwt_secret_key
+   EXPO_PUBLIC_API_URL=http://localhost:8081/api
    ```
+   *(When testing on physical Android devices, set `EXPO_PUBLIC_API_URL` to your local machine IP, e.g., `http://192.168.1.100:8081/api`)*
+
 3. Inject the Initial Owner/Manager Account via secure CLI:
    ```bash
    npm run seed:admin
    # Follow interactive terminal prompt to set owner username and secure password
    ```
-4. Start the backend service:
-   ```bash
-   npm run dev    # Starts with nodemon (or: node index.js)
-   ```
 
-### 2. Mobile App Setup
-1. Open a second terminal and navigate to `mobile/`:
-   ```bash
-   cd mobile
-   npm install
-   ```
-2. Configure mobile client API base URL:
-   Update `mobile/src/api/client.ts` with your local development machine IP address (e.g., `http://192.168.1.100:5000/api`).
-3. Start the Expo development server:
+4. Start the Full-Stack Expo development server:
    ```bash
    npx expo start
    ```
-4. Press `a` to run on connected Android device/emulator, or scan the QR code with the Expo Go Android app.
+   *Expo serves both the mobile client app and the API routes (`/api/*`) seamlessly.*
+
+5. Press `a` to run on connected Android device/emulator, or scan the QR code with the Expo Go Android app.
