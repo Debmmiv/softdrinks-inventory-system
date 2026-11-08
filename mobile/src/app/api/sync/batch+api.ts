@@ -37,6 +37,10 @@ export async function POST(req: Request): Promise<Response> {
       return jsonError("Invalid payload. 'transactions' array is required.", 400);
     }
 
+    if (body.transactions.length > 100) {
+      return jsonError('Batch payload exceeds maximum limit of 100 transactions (NFR6).', 400);
+    }
+
     const transactions: IncomingTx[] = body.transactions;
     await connectToDatabase();
 

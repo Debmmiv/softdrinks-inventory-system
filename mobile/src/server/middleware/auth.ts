@@ -7,7 +7,13 @@ export interface AuthUser {
   role: 'staff' | 'owner/manager';
 }
 
-const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_softdrinks_gusa_2026';
+function getJwtSecret(): string {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    throw new Error('JWT_SECRET is not configured in environment variables.');
+  }
+  return secret;
+}
 
 /**
  * Signs a JWT token for a given user payload.
@@ -19,7 +25,7 @@ export function signToken(user: AuthUser): string {
       username: user.username,
       role: user.role,
     },
-    JWT_SECRET,
+    getJwtSecret(),
     { expiresIn: '30d' }
   );
 }
@@ -40,7 +46,7 @@ export function authenticate(req: Request): { user?: AuthUser; errorResponse?: R
   const token = authHeader.split(' ')[1];
 
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as AuthUser;
+    const decoded = jwt.verify(token, getJwtSecret()) as AuthUser;
     return { user: decoded };
   } catch {
     return {

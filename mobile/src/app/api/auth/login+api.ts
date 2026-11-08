@@ -12,8 +12,14 @@ import { jsonOk, jsonError } from '../../../server/middleware/response';
 export async function POST(req: Request): Promise<Response> {
   try {
     const body = await req.json().catch(() => null);
-    if (!body || !body.username || !body.password) {
-      return jsonError('Username and password are required.', 400);
+    if (
+      !body ||
+      typeof body.username !== 'string' ||
+      typeof body.password !== 'string' ||
+      !body.username.trim() ||
+      !body.password
+    ) {
+      return jsonError('Valid username and password strings are required.', 400);
     }
 
     const { username, password } = body;
