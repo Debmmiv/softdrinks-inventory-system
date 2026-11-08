@@ -19,7 +19,7 @@ export default function DashboardScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const { products, lowStockProducts, isLoading, refresh, search } = useInventory();
-  const { pendingCount, isOnline } = useSync();
+  const { pendingCount, isOnline, syncNow } = useSync();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Product[]>([]);
@@ -42,9 +42,16 @@ export default function DashboardScreen() {
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
-    await refresh();
-    setRefreshing(false);
-  }, [refresh]);
+    try {
+      if (isOnline) {
+        await syncNow();
+      } else {
+        await refresh();
+      }
+    } finally {
+      setRefreshing(false);
+    }
+  }, [isOnline, syncNow, refresh]);
 
   const displayList = searchQuery.trim() ? searchResults : products;
 
