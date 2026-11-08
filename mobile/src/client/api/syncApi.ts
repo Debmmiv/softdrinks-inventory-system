@@ -66,3 +66,54 @@ export async function changePasswordApi(
   });
   return response.data;
 }
+
+export interface AdminUserRecord {
+  _id: string;
+  username: string;
+  full_name: string;
+  role: 'staff' | 'owner/manager';
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface EnrollPayload {
+  username: string;
+  full_name: string;
+  initial_password: string;
+  role?: 'staff' | 'owner/manager';
+}
+
+/**
+ * Enrolls a new staff member online. (FR6)
+ */
+export async function enrollUserApi(payload: EnrollPayload): Promise<{ message: string; user: AdminUserRecord }> {
+  const response = await apiClient.post<{ message: string; user: AdminUserRecord }>('/auth/admin/enroll', payload);
+  return response.data;
+}
+
+/**
+ * Retrieves all registered users in the cloud database. (FR7)
+ */
+export async function fetchUsersApi(): Promise<{ users: AdminUserRecord[] }> {
+  const response = await apiClient.get<{ users: AdminUserRecord[] }>('/auth/users');
+  return response.data;
+}
+
+/**
+ * Toggles an account active/deactivated status. (FR7)
+ */
+export async function toggleUserStatusApi(userId: string, is_active: boolean): Promise<{ message: string; user: AdminUserRecord }> {
+  const response = await apiClient.patch<{ message: string; user: AdminUserRecord }>(`/auth/users/${userId}/status`, { is_active });
+  return response.data;
+}
+
+/**
+ * Resets a staff member's forgotten password. (FR29)
+ */
+export async function resetUserPasswordApi(user_id: string, new_temporary_password: string): Promise<{ message: string }> {
+  const response = await apiClient.post<{ message: string }>('/auth/admin/reset-password', {
+    user_id,
+    new_temporary_password,
+  });
+  return response.data;
+}

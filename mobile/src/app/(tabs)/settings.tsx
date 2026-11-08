@@ -12,6 +12,7 @@ import {
   Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { hashPasswordLocally } from '../../client/utils/crypto';
 import { useAuth } from '../../client/context/AuthContext';
 import { useSync } from '../../client/context/SyncContext';
@@ -25,6 +26,7 @@ import { TABLES } from '../../client/utils/constants';
  * self-serve password change, and secure logout.
  */
 export default function SettingsScreen() {
+  const router = useRouter();
   const { user, deviceId, logout } = useAuth();
   const { pendingCount, isOnline } = useSync();
 
@@ -131,6 +133,32 @@ export default function SettingsScreen() {
           value={isOnline ? 'Online' : 'Offline'}
         />
       </View>
+
+      {/* Owner Administration (visible only to owner/manager) */}
+      {user?.role === 'owner/manager' && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>OWNER CONTROLS</Text>
+          <TouchableOpacity
+            style={styles.actionBtn}
+            onPress={() => router.push('/(owner)/users')}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="people-outline" size={20} color="#2563EB" />
+            <Text style={styles.actionText}>Manage Staff & Users</Text>
+            <Ionicons name="chevron-forward" size={16} color="#CBD5E1" />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.actionBtn, { borderTopWidth: 1, borderTopColor: '#F1F5F9' }]}
+            onPress={() => router.push('/(owner)/users/enroll')}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="person-add-outline" size={20} color="#2563EB" />
+            <Text style={styles.actionText}>Enroll New Staff Member</Text>
+            <Ionicons name="chevron-forward" size={16} color="#CBD5E1" />
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Account Actions */}
       <View style={styles.section}>
@@ -278,6 +306,15 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E2E8F0',
     overflow: 'hidden',
+  },
+  sectionTitle: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#64748B',
+    letterSpacing: 0.8,
+    paddingHorizontal: 14,
+    paddingTop: 12,
+    paddingBottom: 4,
   },
   infoRow: {
     flexDirection: 'row',
