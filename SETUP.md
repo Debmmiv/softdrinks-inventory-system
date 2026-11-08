@@ -55,18 +55,18 @@ npm install --legacy-peer-deps
 
 ```env
 # MongoDB Atlas Connection URI
-MONGODB_URI=mongodb+srv://tiozombay_db_user:XWVxpr3a8JeXTy7@softdrinks-system.tpuqdyy.mongodb.net/softdrinks_db?retryWrites=true&w=majority
+MONGODB_URI=mongodb+srv://<db_user>:<db_password>@cluster0.xxxxx.mongodb.net/softdrinks_db?retryWrites=true&w=majority
 
 # JWT Authentication Secret Key
-JWT_SECRET=super_secret_jwt_key_softdrinks_gusa_2026_xyz
+JWT_SECRET=your_super_secret_jwt_key_here
 
 # Client API Base URL
 EXPO_PUBLIC_API_URL=http://localhost:8081/api
 ```
 
-> 🔑 **Team Database Note**:
-> - You can use the shared team MongoDB Atlas connection string shown above, OR ask the project owner for your specific credentials.
-> - **Never commit `.env` to GitHub!** It is already included in `.gitignore` to protect credentials.
+> 🔑 **Database Setup Note**:
+> - Ask the project owner for the active database connection string, or follow [`documentation/mongodb-atlas-setup-guide.md`](documentation/mongodb-atlas-setup-guide.md) to set up your own free MongoDB Atlas cluster.
+> - **Never commit `.env` or credentials to GitHub!** It is included in `.gitignore` to protect sensitive information.
 
 ---
 
@@ -136,12 +136,12 @@ Once Metro Bundler starts:
 
 When the app opens on your phone/emulator, you will see the Login screen.
 
-### Development Test Credentials:
+### Initial Login Accounts:
 
-| Role | Username | Password | Access Rights |
-|---|---|---|---|
-| **Store Owner** | `zach` *(or your seeded user)* | `ZakLang123` | Full access + Owner controls (Staff enrollment, user status toggle, password resets) |
-| **Warehouse Staff** | `staff` *(or your enrolled staff)* | `staff123` | Operational floor: Delivery, Release, Adjustment, Catalog, History, Sync |
+| Role | Provisioning Method | Access Rights |
+|---|---|---|
+| **Store Owner** | Provisioned via `npm run seed:admin` CLI prompt | Full access + Owner controls (Staff enrollment, user status toggle, password resets, reports) |
+| **Warehouse Staff** | Enrolled by Owner in-app under **Settings -> OWNER CONTROLS** or via `npm run enroll:staff` | Operational floor: Delivery, Release, Adjustment, Catalog, History, Sync |
 
 ### Try The Full Workflow:
 1. **Delivery**: Select a drink (e.g. *Coca-Cola Glass Bottle 330ml*), enter cases and loose bottles, and tap **Record Delivery**. Notice stock immediately updates in SQLite.

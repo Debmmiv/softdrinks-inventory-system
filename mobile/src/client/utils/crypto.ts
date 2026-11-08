@@ -10,12 +10,8 @@ bcrypt.setRandomFallback((len: number) => {
   const buf = new Uint8Array(len);
   try {
     return Array.from(Crypto.getRandomValues(buf));
-  } catch {
-    const arr: number[] = [];
-    for (let i = 0; i < len; i++) {
-      arr.push(Math.floor(Math.random() * 256));
-    }
-    return arr;
+  } catch (err) {
+    throw new Error('Cryptographically secure PRNG unavailable for password hashing.');
   }
 });
 

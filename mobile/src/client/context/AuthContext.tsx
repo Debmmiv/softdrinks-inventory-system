@@ -26,26 +26,6 @@ interface AuthContextValue {
   logout: () => Promise<void>;
 }
 
-// ---- Mock users for offline dev fallback ----------------------------------
-const MOCK_USERS: (User & { password: string })[] = [
-  {
-    id: 'mock-owner-001',
-    username: 'owner',
-    password: 'owner123',
-    full_name: 'Store Owner',
-    role: 'owner/manager',
-    is_active: true,
-  },
-  {
-    id: 'mock-staff-001',
-    username: 'staff',
-    password: 'staff123',
-    full_name: 'Juan Dela Cruz',
-    role: 'staff',
-    is_active: true,
-  },
-];
-
 // ---- Context ---------------------------------------------------------------
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -183,16 +163,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             return { success: true };
           }
           return { success: false, error: 'Invalid username or password.' };
-        }
-
-        // Mock user fallback for local dev
-        const mock = MOCK_USERS.find(
-          (u) => u.username.toLowerCase() === username && u.password === password && u.is_active
-        );
-        if (mock) {
-          const { password: _, ...safeUser } = mock;
-          setUser(safeUser);
-          return { success: true };
         }
 
         if (serverError) {

@@ -1,10 +1,18 @@
-import { Stack } from 'expo-router';
+import { Stack, Redirect } from 'expo-router';
+import { useAuth } from '../../client/context/AuthContext';
 
 /**
- * Owner-Only Protected Stack Layout
+ * Owner-Only Protected Stack Layout (FR4, NFR7)
  * Houses management screens: Reports, Products, Users, Staff Enrollment.
+ * Restricts access strictly to authenticated users with the 'owner/manager' role.
  */
 export default function OwnerLayout() {
+  const { user, isAuthenticated } = useAuth();
+
+  if (!isAuthenticated || user?.role !== 'owner/manager') {
+    return <Redirect href="/(tabs)" />;
+  }
+
   return (
     <Stack
       screenOptions={{
