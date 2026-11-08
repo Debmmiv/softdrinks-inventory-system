@@ -12,7 +12,7 @@ import {
   Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import bcrypt from 'bcryptjs';
+import { hashPasswordLocally } from '../../client/utils/crypto';
 import { useAuth } from '../../client/context/AuthContext';
 import { useSync } from '../../client/context/SyncContext';
 import { changePasswordApi } from '../../client/api/syncApi';
@@ -83,8 +83,7 @@ export default function SettingsScreen() {
       // Update local SQLite users_cache so future offline logins work with new password
       if (user?.id) {
         try {
-          const salt = await bcrypt.genSalt(10);
-          const newHash = await bcrypt.hash(newPassword, salt);
+          const newHash = await hashPasswordLocally(newPassword);
           const db = await getDatabase();
           await db.runAsync(
             `UPDATE ${TABLES.USERS_CACHE} SET password_hash = ? WHERE id = ?`,

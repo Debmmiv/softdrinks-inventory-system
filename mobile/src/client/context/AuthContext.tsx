@@ -8,7 +8,7 @@ import React, {
 } from 'react';
 import * as SecureStore from 'expo-secure-store';
 import * as Crypto from 'expo-crypto';
-import bcrypt from 'bcryptjs';
+import { hashPasswordLocally, comparePasswordLocally } from '../utils/crypto';
 import type { User, Role } from '../types/user';
 import { STORAGE_KEYS, TABLES } from '../utils/constants';
 import { getDatabase } from '../database/db';
@@ -116,8 +116,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           await SecureStore.setItemAsync(STORAGE_KEYS.LOGGED_IN_USER_ID, apiUser.id);
 
           // Hash password and cache user credentials locally for offline authentication (FR3)
-          const salt = await bcrypt.genSalt(10);
-          const passwordHash = await bcrypt.hash(password, salt);
+          const passwordHash = await hashPasswordLocally(password);
 
           const db = await getDatabase();
           await db.runAsync(
@@ -170,7 +169,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         );
 
         if (cached) {
-          const valid = await bcrypt.compare(password, cached.password_hash);
+          const valid = await comparePasswordLocally(password, cached.password_hash);
           if (valid) {
             const cachedUser: User = {
               id: cached.id,
