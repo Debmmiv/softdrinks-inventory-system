@@ -1,5 +1,8 @@
 # Offline-First Soft Drinks Inventory System
 
+> 🚀 **New to the team?** Read the [**Team Setup Guide (SETUP.md)**](SETUP.md) to get running in under 10 minutes!  
+> 🤖 **Working with AI?** Use [**AI-CONTEXT.md**](AI-CONTEXT.md) as the single source of truth for architectural guidelines and rules.
+
 An offline-first inventory management app for a soft drinks wholesale business in Gusa. Staff can record deliveries, releases, and stock adjustments in cases and individual bottles, even without internet. Pending transactions are synchronized to a central database when a connection returns. Built as a full-stack Expo application with Expo Router and integrated Node.js API Routes.
 
 ## Tech Stack
