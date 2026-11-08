@@ -114,14 +114,20 @@ mobile/
 │   │   └── _layout.tsx                     # Root provider wrapper & auth redirect
 │   │
 │   ├── client/                             # CLIENT-SIDE ENGINE (Handheld)
+│   │   ├── api/                            # Client HTTP Axios Bridge
+│   │   │   ├── client.ts                   # Axios singleton with Bearer token interceptor
+│   │   │   └── syncApi.ts                  # Typed endpoints (batch, downstream, auth, admin)
 │   │   ├── context/                        # Global state
-│   │   │   ├── AuthContext.tsx             # User session, device ID, login/logout
+│   │   │   ├── AuthContext.tsx             # Hybrid online/offline auth & SecureStore tokens
 │   │   │   ├── InventoryContext.tsx        # In-memory product cache & stock
-│   │   │   └── SyncContext.tsx             # Outbox queue counters & status
+│   │   │   └── SyncContext.tsx             # Outbox queue counters, online status & sync trigger
 │   │   ├── database/                       # Local SQLite Layer (expo-sqlite)
 │   │   │   ├── db.ts                       # WAL initialization & table DDL
-│   │   │   ├── productRepo.ts              # Local catalog queries & mock seeder
+│   │   │   ├── productRepo.ts              # Local catalog queries & upserts
 │   │   │   └── transactionRepo.ts          # Atomic ledger & sync outbox ops
+│   │   ├── services/                       # Reactive Device Services
+│   │   │   ├── networkService.ts           # NetInfo connectivity subscription
+│   │   │   └── syncEngine.ts               # Bidirectional upstream/downstream sync coordinator
 │   │   ├── types/                          # TypeScript definitions
 │   │   │   ├── inventory.ts
 │   │   │   ├── sync.ts
@@ -129,7 +135,8 @@ mobile/
 │   │   │   └── user.ts
 │   │   └── utils/                          # Calculations & constants
 │   │       ├── calculations.ts             # FR15 conversion engine
-│   │       ├── constants.ts
+│   │       ├── constants.ts                # Dynamic LAN IP / hostUri resolver
+│   │       ├── crypto.ts                   # React Native Hermes bcrypt PRNG polyfill
 │   │       └── date.ts
 │   │
 │   └── server/                             # SERVER-SIDE MODULES (Backend Core)
@@ -144,6 +151,7 @@ mobile/
 │       │   └── User.ts
 │       └── scripts/
 │           ├── seedAdmin.ts                # FR1: CLI Admin Provisioning Tool
+│           ├── seedStaff.ts                # CLI Staff Enrollment Tool
 │           └── testEndpoints.ts            # Automated API integration test suite
 │
 ├── .env                                    # Local configuration (never commit!)
@@ -160,40 +168,52 @@ mobile/
 |---|---|:---:|---|
 | **Phase 1** | Local SQLite Engine & Temporary UI | ✅ Complete | WAL mode, atomic `recordTransaction()`, FR15 math, temporary UI screens |
 | **Phase 2** | MongoDB Atlas & Cloud API Routes | ✅ Complete | 12 API routes built, tested against live Atlas cluster, idempotency verified |
-| **Phase 3** | Client Background Sync Engine | ⏳ **NEXT** | Wire `syncEngine.ts`, NetInfo event listener, and manual "Sync Now" button |
+| **Phase 3** | Client Background Sync Engine & Cloud Auth | ✅ Complete | Bidirectional sync engine, NetInfo listener, hybrid cloud/offline bcrypt auth, in-app staff enrollment |
+| **Phase 4** | Owner Administration & Production Polish | ⏳ **NEXT** | Product management CRUD UI, live replenishment/summary reports UI, visual polish |
 
 ---
 
-## 6. Phase 3 Implementation Directives (What to Build Next)
+## 6. Phase 3 Architecture Summary (Completed Deliverables)
 
-When starting Phase 3, implement the following:
-
-1. **`src/client/services/networkService.ts`**:
-   - Subscribe to `@react-native-community/netinfo`.
-   - Notify `SyncContext` on online/offline state transitions.
-2. **`src/client/services/syncEngine.ts`**:
-   - `syncPendingTransactions()`:
-     1. Read `getPendingQueue()` from SQLite (`PENDING` or `FAILED`).
-     2. If empty, return.
-     3. Mark items as `SYNCING` to prevent duplicate parallel transmissions.
-     4. `POST /api/sync/batch` with `{ transactions: [...] }`.
-     5. For UUIDs in `synced` array: call `markSynced(uuid)`.
-     6. For UUIDs in `failed` array: call `markFailed(uuid, error)`.
-   - `syncDownstreamCatalog()`:
-     1. Call `GET /api/sync/downstream?since=<last_sync_timestamp>`.
-     2. Update local SQLite `products` table via `upsertProduct()`.
-     3. Trigger `InventoryContext.refresh()`.
-3. **Connect to UI**:
-   - Trigger auto-sync when network returns (within 5 seconds per FR18).
-   - Wire manual "Sync Now" button in [`src/app/(tabs)/sync.tsx`](file:///D:/softdrinks-app/softdrinks-inventory-system/mobile/src/app/(tabs)/sync.tsx) (FR19).
+1. **Bidirectional Synchronization Coordinator (`syncEngine.ts`)**:
+   - **Upstream Push (`syncUpstream`)**: Transmits `PENDING`/`FAILED` transactions in FIFO order to `/api/sync/batch`. Marks successful transactions as `SYNCED` and server-rejected transactions as `FAILED` with specific error reasons.
+   - **Downstream Pull (`syncDownstream`)**: Pulls catalog modifications and authoritative warehouse stock counts from `/api/sync/downstream?since=timestamp`, upserting into SQLite and purging legacy placeholder mock products.
+   - **Full Sync Coordinator (`syncAll`)**: Orchestrates upstream push followed by downstream pull, automatically refreshing in-memory inventory state.
+2. **Reactive Network Detector (`networkService.ts`)**:
+   - Subscribes to `@react-native-community/netinfo` to capture online/offline transitions without wasteful polling loops.
+   - When transitioning from offline to online, immediately triggers background sync (FR18).
+3. **Hybrid Cloud + Offline Authentication (`AuthContext.tsx` & `crypto.ts`)**:
+   - First verifies credentials online via `POST /api/auth/login`. On success, caches salted bcrypt hash in SQLite `users_cache` and stores JWT in `expo-secure-store`.
+   - If offline, authenticates against `users_cache` using device-side bcrypt.
+   - Polyfilled `bcrypt.setRandomFallback` with `expo-crypto`'s native PRNG for React Native Hermes.
+4. **Dynamic Host Resolution (`constants.ts`)**:
+   - Extracts Metro's LAN IP from `Constants.expoConfig?.hostUri` so physical Android devices on Wi-Fi reach the Node.js API routes on the host machine without hardcoded configurations.
+5. **In-App Staff Management (`(owner)/users/enroll.tsx` & `(owner)/users/index.tsx`)**:
+   - Owner can enroll new warehouse staff with temporary credentials directly from their mobile phone, toggle active status, and reset passwords.
 
 ---
 
-## 7. Operational Commands
+## 7. Phase 4 Implementation Directives (What to Build Next)
+
+1. **Product Catalog Management UI (`(owner)/products/index.tsx`)**:
+   - Create new products (`POST /api/products`).
+   - Edit reorder alert thresholds and product names (`PATCH /api/products/:id`).
+   - Guard pack size immutability if transactions exist (FR9).
+2. **Cloud Reports & Deficit Analytics UI (`(owner)/reports.tsx`)**:
+   - Real-time stock replenishment alerts (`GET /api/reports/replenishment`) highlighting products below threshold (FR26).
+   - Date-filtered movement summaries (`GET /api/reports/summary`) with delivery vs release vs adjustment totals (FR25).
+3. **End-to-End System Polish & Final Verification**:
+   - Verify multi-user concurrent offline operations.
+   - Run `npx expo-doctor` and `npx tsc --noEmit` on final build.
+
+---
+
+## 8. Operational Commands
 
 Always run from `mobile/`:
-- `npx expo start` — Start dev server
+- `npx expo start` — Start dev server (Metro bundler + server API routes)
 - `npm run test:api` — Run end-to-end API test suite
 - `npm run seed:admin` — Run admin CLI account creator
+- `npm run enroll:staff` — Run staff CLI account creator
 - `npx tsc --noEmit` — Type-check (must always pass with 0 errors)
 - `npx expo-doctor` — Health-check dependencies (must pass 20/20)

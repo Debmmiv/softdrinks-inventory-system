@@ -1,7 +1,10 @@
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
+import path from 'path';
 
+// Ensure .env is loaded regardless of current working directory
 dotenv.config();
+dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
 
 /**
  * MongoDB Atlas Connection Singleton
@@ -33,14 +36,19 @@ export async function connectToDatabase(): Promise<typeof mongoose> {
     );
   }
 
-  if (cached!.conn) {
-    return cached!.conn;
+  // If already connected and socket is open, return active connection
+  if (mongoose.connection.readyState === 1) {
+    cached!.conn = mongoose;
+    return mongoose;
   }
 
-  if (!cached!.promise) {
+  // If disconnected or never connected, initiate connection
+  if (!cached!.promise || mongoose.connection.readyState === 0) {
     const opts: mongoose.ConnectOptions = {
       bufferCommands: false,
       maxPoolSize: 10,
+      serverSelectionTimeoutMS: 8000,
+      connectTimeoutMS: 10000,
     };
 
     cached!.promise = mongoose.connect(MONGODB_URI, opts).then((mongooseInstance) => {
@@ -52,6 +60,7 @@ export async function connectToDatabase(): Promise<typeof mongoose> {
     cached!.conn = await cached!.promise;
   } catch (e) {
     cached!.promise = null;
+    cached!.conn = null;
     throw e;
   }
 

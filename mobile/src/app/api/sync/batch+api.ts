@@ -59,13 +59,29 @@ export async function POST(req: Request): Promise<Response> {
           continue;
         }
 
-        // 2. Validate product exists
-        if (!mongoose.Types.ObjectId.isValid(tx.product_id)) {
+        // 2. Validate product exists (resolve legacy mock IDs if present)
+        let targetProductId = tx.product_id;
+        if (targetProductId.startsWith('mock-prod-')) {
+          const mockNameMap: Record<string, string> = {
+            'mock-prod-001': 'Coca-Cola Glass Bottle',
+            'mock-prod-002': 'Sprite',
+            'mock-prod-003': 'Pepsi Cola',
+            'mock-prod-004': 'Royal Tru-Orange',
+            'mock-prod-005': 'Coke Mismo',
+          };
+          const targetName = mockNameMap[targetProductId];
+          if (targetName) {
+            const found = await Product.findOne({ product_name: targetName });
+            if (found) targetProductId = found._id.toString();
+          }
+        }
+
+        if (!mongoose.Types.ObjectId.isValid(targetProductId)) {
           failed.push({ uuid: tx.uuid, reason: `Invalid product_id: ${tx.product_id}` });
           continue;
         }
 
-        const product = await Product.findById(tx.product_id);
+        const product = await Product.findById(targetProductId);
         if (!product) {
           failed.push({ uuid: tx.uuid, reason: `Product not found: ${tx.product_id}` });
           continue;
@@ -74,7 +90,7 @@ export async function POST(req: Request): Promise<Response> {
         // 3. Insert transaction document
         const newTx = new Transaction({
           uuid: tx.uuid,
-          product_id: tx.product_id,
+          product_id: targetProductId,
           user_id: mongoose.Types.ObjectId.isValid(tx.user_id) ? tx.user_id : auth.user!.id,
           device_id: tx.device_id || 'unknown_device',
           transaction_type: tx.transaction_type,
@@ -90,7 +106,7 @@ export async function POST(req: Request): Promise<Response> {
 
         // 4. Atomically update central product stock (FR21)
         const updatedProduct = await Product.findByIdAndUpdate(
-          tx.product_id,
+          targetProductId,
           {
             $inc: { total_stock_bottles: tx.total_bottles_delta },
             $set: { updated_at: new Date() },

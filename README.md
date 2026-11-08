@@ -292,6 +292,15 @@ All endpoints communicate in JSON (`Content-Type: application/json`). Implemente
 | `GET` | `/api/reports/replenishment` | `src/app/api/reports/replenishment+api.ts` | Owner Only | Returns products where `total_stock <= reorder_threshold` and calculated deficit bottles. |
 | `GET` | `/api/health` | `src/app/api/health+api.ts` | Public | Health check returning `{ ok: true }` and database connectivity status. |
 
+## Project Roadmap & Implementation Status
+
+| Milestone | Scope | Status | Highlights |
+|---|---|:---:|---|
+| **Phase 1: Local Offline Foundation** | SQLite Engine, Business Math & UI | ✅ Complete | WAL journaling, atomic transactions, bottle/case math, outbox queue |
+| **Phase 2: Cloud API & Database** | MongoDB Atlas & Expo Router API Routes | ✅ Complete | 12 Node.js API endpoints, idempotency guard, live Atlas integration |
+| **Phase 3: Background Sync & Cloud Auth** | NetInfo, Sync Engine & In-App Staff Auth | ✅ Complete | Bidirectional sync coordinator, offline bcrypt auth, in-app staff enrollment |
+| **Phase 4: Managerial UI & Polish** | Owner Products CRUD & Deficit Reports | ⏳ Planned | Product management UI, live replenishment alerts, daily reports |
+
 ## Developer Quickstart & Installation
 
 All client code, offline database logic, and API routes reside within the single `mobile/` project.
@@ -306,7 +315,7 @@ All client code, offline database logic, and API routes reside within the single
 1. Open a terminal and navigate to `mobile/`:
    ```bash
    cd mobile
-   npm install
+   npm install --legacy-peer-deps
    ```
 
 2. Configure environment variables in `mobile/.env`:
@@ -315,18 +324,30 @@ All client code, offline database logic, and API routes reside within the single
    JWT_SECRET=your_jwt_secret_key
    EXPO_PUBLIC_API_URL=http://localhost:8081/api
    ```
-   *(When testing on physical Android devices, set `EXPO_PUBLIC_API_URL` to your local machine IP, e.g., `http://192.168.1.100:8081/api`)*
+   *(When testing on physical Android devices, set `EXPO_PUBLIC_API_URL` to your computer's local Wi-Fi IP, e.g., `http://192.168.1.41:8081/api`)*
 
-3. Inject the Initial Owner/Manager Account via secure CLI:
+3. Provision Initial Accounts:
+   - **Bootstrap Owner Account**:
+     ```bash
+     npm run seed:admin
+     # Follow interactive terminal prompt to set owner username and secure password
+     ```
+   - **Enroll Staff Account (Optional CLI)**:
+     ```bash
+     npm run enroll:staff
+     # Or enroll directly inside the mobile app under Settings > Owner Controls
+     ```
+
+4. Verify Cloud Connectivity:
    ```bash
-   npm run seed:admin
-   # Follow interactive terminal prompt to set owner username and secure password
+   npm run test:api
+   # Validates health, auth, products, batch sync, and replenishment reports
    ```
 
-4. Start the Full-Stack Expo development server:
+5. Start the Full-Stack Expo development server:
    ```bash
    npx expo start
    ```
    *Expo serves both the mobile client app and the API routes (`/api/*`) seamlessly.*
 
-5. Press `a` to run on connected Android device/emulator, or scan the QR code with the Expo Go Android app.
+6. Press `a` to run on Android emulator, `w` for Web, or scan the QR code with the Expo Go Android app.

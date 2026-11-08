@@ -37,6 +37,7 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "seed:admin": "tsx src/server/scripts/seedAdmin.ts",
+    "enroll:staff": "tsx src/server/scripts/seedStaff.ts",
     "test:api": "tsx src/server/scripts/testEndpoints.ts"
   },
   "private": true

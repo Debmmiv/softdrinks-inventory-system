@@ -95,14 +95,19 @@ You should see:
 
 ---
 
-### Step 5: (Optional) Seed Your Own Owner Account
+### Step 5: (Optional) Seed Owner & Staff Accounts
 
-If you want to create your own Owner/Manager login account directly in MongoDB Atlas, run:
-
+If you want to create your own Owner/Manager login account directly in MongoDB Atlas via the CLI:
 ```bash
 npm run seed:admin
 ```
 Follow the interactive prompts to choose a username and password.
+
+To enroll a warehouse staff account from the terminal:
+```bash
+npm run enroll:staff
+```
+*(You can also enroll staff directly inside the app under **Settings -> OWNER CONTROLS -> Enroll New Staff Member** once logged in as an Owner).*
 
 ---
 
@@ -116,13 +121,14 @@ npx expo start
 
 Once Metro Bundler starts:
 - **On Android Emulator**: Press **`a`** in the terminal.
+- **On Web Browser**: Press **`w`** in the terminal.
 - **On Physical Android Phone**:
-  1. Make sure your phone and laptop are connected to the **same Wi-Fi network**.
+  1. Make sure your phone and computer are connected to the **same Wi-Fi network**.
   2. Open the **Expo Go** app on your phone.
   3. Scan the QR code displayed in the terminal.
 
-> 📱 **Phone Wi-Fi Tip**:
-> If testing on a physical phone, open `mobile/.env` and change `localhost` in `EXPO_PUBLIC_API_URL` to your computer's local LAN IP (e.g., `http://192.168.1.15:8081/api`).
+> 📱 **Phone Wi-Fi & Dynamic IP Resolution**:
+> The app dynamically extracts your PC's Wi-Fi IP address from the Metro connection. If needed, you can explicitly set your LAN IP in `mobile/.env` (e.g. `EXPO_PUBLIC_API_URL=http://192.168.1.41:8081/api`).
 
 ---
 
@@ -134,14 +140,15 @@ When the app opens on your phone/emulator, you will see the Login screen.
 
 | Role | Username | Password | Access Rights |
 |---|---|---|---|
-| **Warehouse Staff** | `staff` | `staff123` | Operational floor: Delivery, Release, Adjustment, Catalog, History, Sync |
-| **Store Owner** | `owner` *(or your seeded user)* | `owner123` | Everything above + Owner managerial screens & reports |
+| **Store Owner** | `zach` *(or your seeded user)* | `ZakLang123` | Full access + Owner controls (Staff enrollment, user status toggle, password resets) |
+| **Warehouse Staff** | `staff` *(or your enrolled staff)* | `staff123` | Operational floor: Delivery, Release, Adjustment, Catalog, History, Sync |
 
-### Try Recording Transactions:
-1. **Delivery**: Select a drink (e.g. *Coca-Cola 1.5L*), enter cases and loose bottles, and tap **Record Delivery**. Notice stock immediately updates.
+### Try The Full Workflow:
+1. **Delivery**: Select a drink (e.g. *Coca-Cola Glass Bottle 330ml*), enter cases and loose bottles, and tap **Record Delivery**. Notice stock immediately updates in SQLite.
 2. **Release (Guardrail Check)**: Try releasing **more** bottles than are on hand. Notice the app blocks the transaction immediately (FR13 safety guard!).
-3. **Adjustment**: Record damaged or broken bottles with a mandatory reason.
-4. **Airplane Mode Test**: Turn your phone on Airplane Mode and record a delivery. Notice it saves in <10ms to local SQLite with zero errors!
+3. **Outbox & Cloud Sync**: Tap the **Sync** tab. Notice your new transaction is queued as `PENDING`. Tap **Sync Now** to push it to MongoDB Atlas!
+4. **Offline Mode Test**: Turn your phone on Airplane Mode and record a delivery or release. Notice it saves in <10ms to local SQLite. Log out and log back in while offline—the phone authenticates locally via the encrypted SQLite cache!
+5. **In-App Staff Enrollment**: Go to **Settings -> OWNER CONTROLS -> Enroll New Staff Member**, fill in an employee's name and password, and create their account right from your phone.
 
 ---
 
@@ -155,6 +162,7 @@ All commands should be executed from inside `mobile/`:
 | `npx expo start -c` | Clears Metro bundler cache (run if you see weird cache bugs) |
 | `npm run test:api` | Runs automated test suite verifying all MongoDB cloud endpoints |
 | `npm run seed:admin` | CLI interactive tool to create a new Owner/Manager account |
+| `npm run enroll:staff` | CLI interactive tool to enroll a new Warehouse Staff account |
 | `npx tsc --noEmit` | Runs full TypeScript compiler check across client & server |
 | `npx expo-doctor` | Runs 20 system health checks on dependencies and configurations |
 

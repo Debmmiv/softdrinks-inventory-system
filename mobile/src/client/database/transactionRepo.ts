@@ -168,3 +168,14 @@ export async function markSyncing(uuid: string): Promise<void> {
     [uuid]
   );
 }
+
+/** Fetches multiple transactions by their UUIDs for batch sync payload. */
+export async function getTransactionsByUuids(uuids: string[]): Promise<Transaction[]> {
+  if (uuids.length === 0) return [];
+  const db = await getDatabase();
+  const placeholders = uuids.map(() => '?').join(',');
+  return db.getAllAsync<Transaction>(
+    `SELECT * FROM ${TABLES.TRANSACTIONS} WHERE uuid IN (${placeholders})`,
+    uuids
+  );
+}
