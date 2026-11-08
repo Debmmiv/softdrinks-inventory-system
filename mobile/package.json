@@ -36,7 +36,8 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "seed:admin": "tsx src/server/scripts/seedAdmin.ts"
+    "seed:admin": "tsx src/server/scripts/seedAdmin.ts",
+    "test:api": "tsx src/server/scripts/testEndpoints.ts"
   },
   "private": true
 }
