@@ -10,7 +10,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { getAllQueueItems } from '../../client/database/transactionRepo';
+import { getAllQueueItems, dismissFailedItems } from '../../client/database/transactionRepo';
 import { useSync } from '../../client/context/SyncContext';
 import { formatDisplayDate } from '../../client/utils/date';
 import type { QueueItem } from '../../client/types/sync';
@@ -78,6 +78,28 @@ export default function SyncScreen() {
     }
   }
 
+  async function handleDismissFailed() {
+    Alert.alert(
+      'Dismiss Failed Items',
+      'This will remove all failed transactions from the queue. The transaction records are preserved in the history log but will no longer attempt to sync. Continue?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Dismiss All Failed',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await dismissFailedItems();
+              await load();
+            } catch (err) {
+              Alert.alert('Error', 'Could not dismiss failed items.');
+            }
+          },
+        },
+      ]
+    );
+  }
+
   const pending = items.filter((i) => i.status === 'PENDING').length;
   const synced = items.filter((i) => i.status === 'SYNCED').length;
   const failed = items.filter((i) => i.status === 'FAILED').length;
@@ -127,6 +149,18 @@ export default function SyncScreen() {
           </>
         )}
       </TouchableOpacity>
+
+      {/* Clear Failed Button — only shown when there are failed items */}
+      {failed > 0 && (
+        <TouchableOpacity
+          style={styles.dismissBtn}
+          onPress={handleDismissFailed}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="trash-outline" size={16} color="#DC2626" />
+          <Text style={styles.dismissBtnText}>Clear {failed} Failed Item{failed > 1 ? 's' : ''}</Text>
+        </TouchableOpacity>
+      )}
 
       {/* Outbox List Section */}
       <View style={styles.queueHeaderRow}>
@@ -255,6 +289,18 @@ const styles = StyleSheet.create({
   },
   syncBtnDisabled: { opacity: 0.5 },
   syncBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  dismissBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    borderWidth: 1.5,
+    borderColor: '#DC2626',
+    borderRadius: 12,
+    paddingVertical: 10,
+    marginBottom: 20,
+  },
+  dismissBtnText: { color: '#DC2626', fontSize: 13, fontWeight: '700' },
   queueHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',

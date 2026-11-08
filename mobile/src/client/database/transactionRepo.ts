@@ -169,6 +169,22 @@ export async function markSyncing(uuid: string): Promise<void> {
   );
 }
 
+/**
+ * Permanently dismisses all FAILED queue items by marking them as 'SYNCED'.
+ * Used when a transaction cannot ever be synced (e.g., references a mock product
+ * that no longer exists in the canonical catalog). The transaction record itself
+ * is preserved in the immutable ledger; only the queue entry is dismissed.
+ */
+export async function dismissFailedItems(): Promise<void> {
+  const db = await getDatabase();
+  await db.runAsync(
+    `UPDATE ${TABLES.SYNC_QUEUE}
+     SET status = 'SYNCED', synced_at = ?, error_message = 'Dismissed by user'
+     WHERE status = 'FAILED'`,
+    [nowISO()]
+  );
+}
+
 /** Fetches multiple transactions by their UUIDs for batch sync payload. */
 export async function getTransactionsByUuids(uuids: string[]): Promise<Transaction[]> {
   if (uuids.length === 0) return [];
