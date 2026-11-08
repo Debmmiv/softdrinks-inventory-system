@@ -103,8 +103,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       const isOnline = await networkService.checkOnlineAsync();
+      let serverError: string | null = null;
 
-      // 1. Online Login Attempt
+      // 1. Online Login Attempt (FR2)
       if (isOnline) {
         try {
           const res = await loginApi(username, password);
@@ -138,14 +139,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
           return { success: true };
         } catch (err: any) {
-          // If server returned 401 or 403, credentials or status are invalid on cloud
           if (err?.response?.status === 401 || err?.response?.status === 403) {
             return {
               success: false,
               error: err.response.data?.error || 'Invalid username or password.',
             };
           }
-          console.warn('[AuthContext] Cloud login failed, falling back to local cache:', err?.message);
+          serverError =
+            err?.response?.data?.details ||
+            err?.response?.data?.error ||
+            err?.message ||
+            'Could not reach authentication server.';
+          console.warn('[AuthContext] Cloud login failed, checking local cache:', serverError);
         }
       }
 
@@ -191,10 +196,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return { success: true };
         }
 
+        if (serverError) {
+          return {
+            success: false,
+            error: `Server connection issue: ${serverError}`,
+          };
+        }
+
         return {
           success: false,
           error: isOnline
-            ? 'Invalid username or password.'
+            ? 'Account not found. Please verify your username.'
             : 'Device is offline and no local credentials found. Please log in online once first.',
         };
       } catch (err) {
