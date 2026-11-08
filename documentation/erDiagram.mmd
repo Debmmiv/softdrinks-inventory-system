@@ -1,0 +1,50 @@
+erDiagram
+    USERS_CACHE {
+        TEXT id PK "MongoDB ObjectId string"
+        TEXT username UK "Unique login handle"
+        TEXT password_hash "Salted bcrypt hash"
+        TEXT full_name "Employee name"
+        TEXT role "staff | owner/manager"
+        INTEGER is_active "1 = Active, 0 = Inactive"
+    }
+
+    PRODUCTS {
+        TEXT id PK "MongoDB ObjectId string"
+        TEXT brand_name "e.g. Coca-Cola, Pepsi"
+        TEXT product_name "e.g. Coke Original, Sprite"
+        TEXT bottle_size "e.g. 1.5L, 500ml, 12oz"
+        INTEGER units_per_case "Pack size (IMMUTABLE)"
+        INTEGER reorder_threshold_bottles "Alert threshold"
+        INTEGER local_stock_bottles "Current on-hand count"
+        INTEGER is_active "1 = Active, 0 = Inactive"
+        TEXT updated_at "ISO 8601 UTC timestamp"
+    }
+
+    TRANSACTIONS {
+        TEXT uuid PK "RFC4122 UUIDv4 generated on device"
+        TEXT product_id FK "References PRODUCTS.id"
+        TEXT user_id "ID of initiating staff"
+        TEXT device_id "Permanent device identifier UUID"
+        TEXT transaction_type "DELIVERY | RELEASE | ADJUSTMENT"
+        INTEGER cases "Input cases count (>= 0)"
+        INTEGER loose_bottles "Input loose bottles count (>= 0)"
+        INTEGER total_bottles_delta "Signed count (+ or -)"
+        INTEGER resulting_stock_bottles "Post-transaction balance snapshot"
+        TEXT reason "breakage | damage | loss | count_correction"
+        TEXT remarks "Optional operator comments"
+        TEXT reference_tag "Customer name, DR #, or Receipt #"
+        TEXT created_at "ISO 8601 UTC timestamp"
+    }
+
+    SYNC_QUEUE {
+        INTEGER queue_id PK "Auto-incrementing sequence"
+        TEXT transaction_uuid UK "References TRANSACTIONS.uuid"
+        TEXT status "PENDING | SYNCING | SYNCED | FAILED"
+        INTEGER retry_count "Transmission retry counter"
+        TEXT error_message "Failure reason string"
+        TEXT queued_at "ISO 8601 UTC timestamp"
+        TEXT synced_at "ISO 8601 UTC timestamp (nullable)"
+    }
+
+    PRODUCTS ||--o{ TRANSACTIONS : "records movement for"
+    TRANSACTIONS ||--|| SYNC_QUEUE : "tracked in outbox by"
