@@ -81,6 +81,15 @@ class SyncEngine {
       const response = await fetchDownstreamApi(lastSync);
 
       if (response.products && response.products.length > 0) {
+        // Clear out legacy mock products now that real catalog is synced from MongoDB Atlas
+        try {
+          const { getDatabase } = await import('../database/db');
+          const db = await getDatabase();
+          await db.runAsync(`DELETE FROM products WHERE id LIKE 'mock-prod-%'`);
+        } catch (cleanErr) {
+          console.warn('[SyncEngine] Mock products cleanup notice:', cleanErr);
+        }
+
         for (const p of response.products) {
           await upsertProduct({
             id: p._id,
