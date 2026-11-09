@@ -2,7 +2,7 @@ import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 import path from 'path';
 
-// Ensure .env is loaded regardless of current working directory
+
 dotenv.config();
 dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
 

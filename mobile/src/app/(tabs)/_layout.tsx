@@ -1,23 +1,21 @@
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useAuth } from '../../client/context/AuthContext';
-import { useSync } from '../../client/context/SyncContext';
-import { View, Text, StyleSheet } from 'react-native';
+import HeaderMenu from '../../client/components/HeaderMenu';
 
 /**
  * Tab bar layout (FR4 — RBAC).
- * Staff see 7 tabs. Owner/Manager see the same 7 plus a "Manage" section entry.
+ * The bottom tab bar holds the daily warehouse actions:
+ *   Dashboard, Delivery, Release, Adjust.
+ * Catalog, Sync, History and Settings are still routable screens, but they
+ * live in the dropdown menu (top-left of the header) via <HeaderMenu />.
  * Owner-only screens (Products, Reports, Users) live in the (owner) route group.
  */
 export default function TabsLayout() {
-  const { user } = useAuth();
-  const { pendingCount } = useSync();
-  const isOwner = user?.role === 'owner/manager';
-
   return (
     <Tabs
       screenOptions={{
         headerShown: true,
+        headerLeft: () => <HeaderMenu />,
         tabBarActiveTintColor: '#2563EB',
         tabBarInactiveTintColor: '#94A3B8',
         tabBarStyle: { paddingBottom: 4, height: 60 },
@@ -25,7 +23,7 @@ export default function TabsLayout() {
         headerTintColor: '#0F172A',
       }}
     >
-      {/* ── Shared screens (Staff & Owner) ── */}
+      {/* ── Bottom tabs ── */}
       <Tabs.Screen
         name="index"
         options={{
@@ -62,73 +60,12 @@ export default function TabsLayout() {
           ),
         }}
       />
-      <Tabs.Screen
-        name="catalog"
-        options={{
-          title: 'Catalog',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="list-outline" size={size} color={color as string} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="sync"
-        options={{
-          title: 'Sync',
-          tabBarIcon: ({ color, size }) => (
-            <View>
-              <Ionicons name="sync-outline" size={size} color={color as string} />
-              {pendingCount > 0 && (
-                <View style={styles.badge}>
-                  <Text style={styles.badgeText}>
-                    {pendingCount > 99 ? '99+' : pendingCount}
-                  </Text>
-                </View>
-              )}
-            </View>
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="settings"
-        options={{
-          title: 'Settings',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="settings-outline" size={size} color={color as string} />
-          ),
-        }}
-      />
 
-      {/* ── History (accessible to all, placed last) ── */}
-      <Tabs.Screen
-        name="history"
-        options={{
-          title: 'History',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="time-outline" size={size} color={color as string} />
-          ),
-          // Hide from tab bar if too many tabs — accessible via Dashboard shortcut
-          href: isOwner ? '/history' : '/history',
-        }}
-      />
+      {/* ── Dropdown-menu screens: hidden from the tab bar (href: null) ── */}
+      <Tabs.Screen name="catalog" options={{ title: 'Catalog', href: null }} />
+      <Tabs.Screen name="sync" options={{ title: 'Sync', href: null }} />
+      <Tabs.Screen name="history" options={{ title: 'History', href: null }} />
+      <Tabs.Screen name="settings" options={{ title: 'Settings', href: null }} />
     </Tabs>
   );
 }
-
-const styles = StyleSheet.create({
-  badge: {
-    position: 'absolute',
-    top: -4,
-    right: -8,
-    backgroundColor: '#EF4444',
-    borderRadius: 8,
-    minWidth: 16,
-    paddingHorizontal: 3,
-    alignItems: 'center',
-  },
-  badgeText: {
-    color: '#fff',
-    fontSize: 9,
-    fontWeight: '700',
-  },
-});
