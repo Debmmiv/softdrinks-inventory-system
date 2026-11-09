@@ -76,6 +76,20 @@ export async function POST(req: Request): Promise<Response> {
 
     await connectToDatabase();
 
+    // Check for duplicate product with identical brand, product name, and bottle size
+    const existing = await Product.findOne({
+      brand_name: { $regex: new RegExp(`^${brand_name.trim()}$`, 'i') },
+      product_name: { $regex: new RegExp(`^${product_name.trim()}$`, 'i') },
+      bottle_size: { $regex: new RegExp(`^${bottle_size.trim()}$`, 'i') },
+    });
+
+    if (existing) {
+      return jsonError(
+        `Product "${brand_name} - ${product_name} (${bottle_size})" already exists in the catalog.`,
+        409
+      );
+    }
+
     const newProduct = new Product({
       brand_name: brand_name.trim(),
       product_name: product_name.trim(),

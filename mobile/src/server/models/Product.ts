@@ -60,7 +60,8 @@ const ProductSchema = new Schema<IProduct>(
   }
 );
 
-ProductSchema.index({ brand_name: 1, product_name: 1 });
+// Compound unique index ensuring no duplicate products with same brand, name, and size
+ProductSchema.index({ brand_name: 1, product_name: 1, bottle_size: 1 }, { unique: true });
 
 export const Product: Model<IProduct> =
   mongoose.models.Product || mongoose.model<IProduct>('Product', ProductSchema);

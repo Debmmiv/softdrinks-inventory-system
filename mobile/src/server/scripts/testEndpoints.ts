@@ -46,6 +46,7 @@ async function runTests() {
   console.log('✓ Products retrieval passed!\n');
 
   console.log('--- 4. Testing POST /api/products (Create test product in Atlas) ---');
+  const tempTestName = 'Test Drink ' + Date.now();
   const createProdReq = new Request('http://localhost:8081/api/products', {
     method: 'POST',
     headers: {
@@ -53,9 +54,9 @@ async function runTests() {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      brand_name: 'Coca-Cola',
-      product_name: 'Coke Original',
-      bottle_size: '1.5L',
+      brand_name: 'TestBrand',
+      product_name: tempTestName,
+      bottle_size: '500ml',
       units_per_case: 12,
       reorder_threshold_bottles: 24,
       initial_stock_bottles: 48,
@@ -64,6 +65,7 @@ async function runTests() {
   const createProdRes = await productsPost(createProdReq);
   const createProdJson = await createProdRes.json();
   console.log('Created product ID:', createProdJson.product?._id);
+  if (createProdRes.status !== 201) throw new Error('Product creation failed');
   console.log('✓ Product creation passed!\n');
 
   const createdId = createProdJson.product?._id;
@@ -128,6 +130,14 @@ async function runTests() {
   const repJson = await repRes.json();
   console.log('Replenishment report:', repJson);
   console.log('✓ Replenishment report verified!\n');
+
+  // Clean up temporary test product and test transaction so database stays pristine
+  console.log('--- 8. Cleaning up test artifacts ---');
+  const { Product } = await import('../models/Product');
+  const { Transaction } = await import('../models/Transaction');
+  if (createdId) await Product.findByIdAndDelete(createdId);
+  await Transaction.deleteOne({ uuid: testUuid });
+  console.log('✓ Test artifacts cleanly purged!\n');
 
   console.log('========================================================');
   console.log('  ALL PHASE 2 API ENDPOINTS VERIFIED 100% OPERATIONAL!  ');

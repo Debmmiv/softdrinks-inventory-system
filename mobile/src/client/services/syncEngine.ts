@@ -81,13 +81,24 @@ class SyncEngine {
       const response = await fetchDownstreamApi(lastSync);
 
       if (response.products && response.products.length > 0) {
-        // Clear out legacy mock products now that real catalog is synced from MongoDB Atlas
+        // Clean out legacy mock products & prune stale duplicate products not in Atlas
         try {
           const { getDatabase } = await import('../database/db');
           const db = await getDatabase();
           await db.runAsync(`DELETE FROM products WHERE id LIKE 'mock-prod-%'`);
+
+          // Deactivate or delete local products no longer present in cloud catalog
+          const activeIds = response.products.map((p) => p._id);
+          const placeholders = activeIds.map(() => '?').join(',');
+          await db.runAsync(
+            `UPDATE products SET is_active = 0 WHERE id NOT IN (${placeholders})`,
+            activeIds
+          );
+          await db.runAsync(
+            `DELETE FROM products WHERE is_active = 0 AND id NOT IN (SELECT DISTINCT product_id FROM transactions)`
+          );
         } catch (cleanErr) {
-          console.warn('[SyncEngine] Mock products cleanup notice:', cleanErr);
+          console.warn('[SyncEngine] Catalog reconciliation notice:', cleanErr);
         }
 
         for (const p of response.products) {

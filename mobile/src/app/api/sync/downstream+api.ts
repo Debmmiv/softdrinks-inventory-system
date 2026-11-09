@@ -17,15 +17,8 @@ export async function GET(req: Request): Promise<Response> {
 
     await connectToDatabase();
 
-    const query: Record<string, unknown> = {};
-    if (sinceParam) {
-      const sinceDate = new Date(sinceParam);
-      if (!isNaN(sinceDate.getTime())) {
-        query.updated_at = { $gt: sinceDate };
-      }
-    }
-
-    const products = await Product.find(query).sort({ updated_at: 1 });
+    // Authoritative active catalog reconciliation (FR23, FR31)
+    const products = await Product.find({ is_active: true }).sort({ brand_name: 1, product_name: 1 });
 
     return jsonOk({
       server_time: new Date().toISOString(),
