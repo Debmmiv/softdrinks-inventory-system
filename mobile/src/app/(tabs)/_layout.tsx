@@ -1,21 +1,30 @@
-import { Tabs } from 'expo-router';
+import { Tabs, Redirect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import HeaderMenu from '../../client/components/HeaderMenu';
+import HeaderRightStatus from '../../client/components/HeaderRightStatus';
+import { useAuth } from '../../client/context/AuthContext';
 
 /**
  * Tab bar layout (FR4 — RBAC).
  * The bottom tab bar holds the daily warehouse actions:
  *   Dashboard, Delivery, Release, Adjust.
- * Catalog, Sync, History and Settings are still routable screens, but they
+ * Secondary screens (Catalog, Sync, History, Settings) and owner screens
  * live in the dropdown menu (top-left of the header) via <HeaderMenu />.
- * Owner-only screens (Products, Reports, Users) live in the (owner) route group.
+ * Real-time cloud sync & network status is displayed on the top-right via <HeaderRightStatus />.
  */
 export default function TabsLayout() {
+  const { isAuthenticated } = useAuth();
+
+  if (!isAuthenticated) {
+    return <Redirect href="/(auth)/login" />;
+  }
+
   return (
     <Tabs
       screenOptions={{
         headerShown: true,
         headerLeft: () => <HeaderMenu />,
+        headerRight: () => <HeaderRightStatus />,
         tabBarActiveTintColor: '#2563EB',
         tabBarInactiveTintColor: '#94A3B8',
         tabBarStyle: { paddingBottom: 4, height: 60 },
