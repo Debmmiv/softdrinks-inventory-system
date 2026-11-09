@@ -3,7 +3,7 @@ import {
   View, Text, FlatList, TouchableOpacity, TextInput,
   StyleSheet, ActivityIndicator, RefreshControl,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useNavigation } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../client/context/AuthContext';
 import { useInventory } from '../../client/context/InventoryContext';
@@ -17,6 +17,7 @@ import type { Product } from '../../client/types/inventory';
  */
 export default function DashboardScreen() {
   const router = useRouter();
+  const navigation = useNavigation<any>();
   const { user } = useAuth();
   const { products, lowStockProducts, isLoading, refresh, search } = useInventory();
   const { pendingCount, isOnline, syncNow } = useSync();
@@ -86,10 +87,10 @@ export default function DashboardScreen() {
 
       {/* Quick actions */}
       <View style={styles.actionsRow}>
-        <QuickAction label="Delivery" icon="archive-outline" color="#2563EB" onPress={() => router.push('/(tabs)/delivery')} />
-        <QuickAction label="Release" icon="exit-outline" color="#16A34A" onPress={() => router.push('/(tabs)/release')} />
-        <QuickAction label="Adjust" icon="swap-vertical-outline" color="#D97706" onPress={() => router.push('/(tabs)/adjustment')} />
-        <QuickAction label="History" icon="time-outline" color="#7C3AED" onPress={() => router.push('/(tabs)/history')} />
+        <QuickAction label="Delivery" icon="archive-outline" color="#2563EB" onPress={() => navigation.navigate('delivery')} />
+        <QuickAction label="Release" icon="exit-outline" color="#16A34A" onPress={() => navigation.navigate('release')} />
+        <QuickAction label="Adjust" icon="swap-vertical-outline" color="#D97706" onPress={() => navigation.navigate('adjustment')} />
+        <QuickAction label="History" icon="time-outline" color="#7C3AED" onPress={() => navigation.navigate('history')} />
       </View>
 
       {/* Real-time search bar (FR27) */}

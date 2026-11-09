@@ -9,22 +9,23 @@ import {
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter, usePathname } from 'expo-router';
+import { useRouter, usePathname, useNavigation } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
 import { useSync } from '../context/SyncContext';
 
 type MenuItem = {
   label: string;
+  tabName?: string;
   path: string;
   icon: keyof typeof Ionicons.glyphMap;
 };
 
 const STANDARD_MENU_ITEMS: MenuItem[] = [
-  { label: 'Catalog', path: '/catalog', icon: 'list-outline' },
-  { label: 'Sync Queue', path: '/sync', icon: 'sync-outline' },
-  { label: 'Audit History', path: '/history', icon: 'time-outline' },
-  { label: 'Settings', path: '/settings', icon: 'settings-outline' },
+  { label: 'Catalog', tabName: 'catalog', path: '/(tabs)/catalog', icon: 'list-outline' },
+  { label: 'Sync Queue', tabName: 'sync', path: '/(tabs)/sync', icon: 'sync-outline' },
+  { label: 'Audit History', tabName: 'history', path: '/(tabs)/history', icon: 'time-outline' },
+  { label: 'Settings', tabName: 'settings', path: '/(tabs)/settings', icon: 'settings-outline' },
 ];
 
 const OWNER_MENU_ITEMS: MenuItem[] = [
@@ -42,6 +43,7 @@ const OWNER_MENU_ITEMS: MenuItem[] = [
 export default function HeaderMenu() {
   const [open, setOpen] = useState(false);
   const router = useRouter();
+  const navigation = useNavigation<any>();
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
   const { user, logout } = useAuth();
@@ -49,9 +51,20 @@ export default function HeaderMenu() {
 
   const isOwner = user?.role === 'owner/manager';
 
-  const go = (path: string) => {
+  const isItemActive = (path: string) => {
+    return pathname === path || pathname === path.replace('/(tabs)', '');
+  };
+
+  const go = (item: MenuItem) => {
     setOpen(false);
-    router.navigate(path as any);
+    if (isItemActive(item.path)) return;
+    setTimeout(() => {
+      if (item.tabName) {
+        navigation.navigate(item.tabName);
+      } else {
+        router.push(item.path as any);
+      }
+    }, 100);
   };
 
   const handleLogout = () => {
@@ -111,11 +124,12 @@ export default function HeaderMenu() {
             <ScrollView bounces={false} contentContainerStyle={styles.scrollList}>
               {/* Standard Screens */}
               {STANDARD_MENU_ITEMS.map((item, index) => {
-                const active = pathname === item.path;
+                const active = isItemActive(item.path);
+                const isSyncItem = item.path.includes('/sync');
                 return (
                   <Pressable
                     key={item.path}
-                    onPress={() => go(item.path)}
+                    onPress={() => go(item)}
                     style={({ pressed }) => [
                       styles.item,
                       index < STANDARD_MENU_ITEMS.length - 1 && styles.itemDivider,
@@ -130,7 +144,7 @@ export default function HeaderMenu() {
                     <Text style={[styles.label, active && styles.labelActive]}>
                       {item.label}
                     </Text>
-                    {item.path === '/sync' && pendingCount > 0 && (
+                    {isSyncItem && pendingCount > 0 && (
                       <View style={styles.badge}>
                         <Text style={styles.badgeText}>
                           {pendingCount > 99 ? '99+' : pendingCount}
@@ -152,7 +166,7 @@ export default function HeaderMenu() {
                     return (
                       <Pressable
                         key={item.path}
-                        onPress={() => go(item.path)}
+                        onPress={() => go(item)}
                         style={({ pressed }) => [
                           styles.item,
                           index < OWNER_MENU_ITEMS.length - 1 && styles.itemDivider,

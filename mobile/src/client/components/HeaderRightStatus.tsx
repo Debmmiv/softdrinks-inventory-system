@@ -1,6 +1,6 @@
 import { TouchableOpacity, View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useNavigation } from 'expo-router';
 import { useSync } from '../context/SyncContext';
 
 /**
@@ -9,13 +9,13 @@ import { useSync } from '../context/SyncContext';
  * Tapping it navigates immediately to the Sync screen.
  */
 export default function HeaderRightStatus() {
-  const router = useRouter();
+  const navigation = useNavigation<any>();
   const { isOnline, isSyncing, pendingCount } = useSync();
 
   return (
     <TouchableOpacity
       style={styles.container}
-      onPress={() => router.navigate('/sync' as any)}
+      onPress={() => navigation.navigate('sync')}
       activeOpacity={0.7}
       hitSlop={8}
       accessibilityRole="button"

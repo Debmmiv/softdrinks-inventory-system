@@ -70,11 +70,39 @@ export default function TabsLayout() {
         }}
       />
 
-      {/* ── Dropdown-menu screens: hidden from the tab bar (href: null) ── */}
-      <Tabs.Screen name="catalog" options={{ title: 'Catalog', href: null }} />
-      <Tabs.Screen name="sync" options={{ title: 'Sync', href: null }} />
-      <Tabs.Screen name="history" options={{ title: 'History', href: null }} />
-      <Tabs.Screen name="settings" options={{ title: 'Settings', href: null }} />
+      {/* ── Secondary screens: hidden from bottom tab bar but fully routable ── */}
+      <Tabs.Screen
+        name="catalog"
+        options={{
+          title: 'Catalog',
+          tabBarButton: () => null,
+          tabBarItemStyle: { display: 'none' },
+        }}
+      />
+      <Tabs.Screen
+        name="sync"
+        options={{
+          title: 'Sync Queue',
+          tabBarButton: () => null,
+          tabBarItemStyle: { display: 'none' },
+        }}
+      />
+      <Tabs.Screen
+        name="history"
+        options={{
+          title: 'Audit History',
+          tabBarButton: () => null,
+          tabBarItemStyle: { display: 'none' },
+        }}
+      />
+      <Tabs.Screen
+        name="settings"
+        options={{
+          title: 'Settings',
+          tabBarButton: () => null,
+          tabBarItemStyle: { display: 'none' },
+        }}
+      />
     </Tabs>
   );
 }
