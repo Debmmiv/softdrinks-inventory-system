@@ -1,7 +1,15 @@
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 import path from 'path';
+import dns from 'dns';
 
+// Fix for Windows / Node.js DNS SRV resolution failure (querySrv ECONNREFUSED)
+// Home routers & some ISP DNS servers do not properly resolve SRV records over UDP.
+try {
+  dns.setServers(['8.8.8.8', '8.8.4.4', '1.1.1.1']);
+} catch {
+  // Ignore if running in a restricted or non-Node environment
+}
 
 dotenv.config();
 dotenv.config({ path: path.resolve(__dirname, '../../../.env') });

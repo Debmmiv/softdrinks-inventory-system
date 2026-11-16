@@ -6,6 +6,8 @@ export interface IUser extends Document {
   full_name: string;
   role: 'staff' | 'owner/manager';
   is_active: boolean;
+  /** Incremented to invalidate every JWT issued before the change (password reset, deactivation). */
+  token_version: number;
   created_at: Date;
 }
 
@@ -37,6 +39,10 @@ const UserSchema = new Schema<IUser>(
     is_active: {
       type: Boolean,
       default: true,
+    },
+    token_version: {
+      type: Number,
+      default: 0,
     },
     created_at: {
       type: Date,

@@ -9,7 +9,7 @@ import { jsonOk, jsonError } from '../../../../server/middleware/response';
  * FR6: Owner-only enrollment of newly hired staff or manager accounts.
  */
 export async function POST(req: Request): Promise<Response> {
-  const auth = authenticate(req);
+  const auth = await authenticate(req);
   if (auth.errorResponse) return auth.errorResponse;
 
   const ownerCheck = requireOwner(auth.user!);

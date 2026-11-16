@@ -3,12 +3,13 @@ import {
   View, Text, FlatList, TouchableOpacity, TextInput,
   StyleSheet, ActivityIndicator, RefreshControl,
 } from 'react-native';
-import { useRouter, useNavigation } from 'expo-router';
+import { useRouter, useNavigation, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../client/context/AuthContext';
 import { useInventory } from '../../client/context/InventoryContext';
 import { useSync } from '../../client/context/SyncContext';
 import { formatStock } from '../../client/utils/calculations';
+import { fetchDiscrepanciesApi } from '../../client/api/syncApi';
 import type { Product } from '../../client/types/inventory';
 
 /**
@@ -26,6 +27,22 @@ export default function DashboardScreen() {
   const [searchResults, setSearchResults] = useState<Product[]>([]);
   const [searching, setSearching] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [openDiscrepancies, setOpenDiscrepancies] = useState(0);
+
+  // NFR13: owners see unresolved concurrency deficits the moment they open the dashboard.
+  // Best-effort: silent when offline or when the call fails, the screen itself shows errors.
+  useFocusEffect(
+    useCallback(() => {
+      if (user?.role !== 'owner/manager' || !isOnline) return;
+      let active = true;
+      fetchDiscrepanciesApi('open')
+        .then((res) => active && setOpenDiscrepancies(res.open_count))
+        .catch(() => {});
+      return () => {
+        active = false;
+      };
+    }, [user?.role, isOnline])
+  );
 
   // FR27: Real-time search with debounce-like approach
   const handleSearch = useCallback(async (text: string) => {
@@ -70,6 +87,20 @@ export default function DashboardScreen() {
           {pendingCount > 0 && ` · ${pendingCount} pending sync`}
         </Text>
       </View>
+
+      {/* Owner-only: unresolved stock discrepancies (NFR13) */}
+      {user?.role === 'owner/manager' && openDiscrepancies > 0 && (
+        <TouchableOpacity
+          style={styles.discrepancyBanner}
+          onPress={() => router.push('/(owner)/discrepancies' as any)}
+        >
+          <Ionicons name="alert-circle" size={18} color="#B91C1C" />
+          <Text style={styles.discrepancyText}>
+            {openDiscrepancies} stock discrepanc{openDiscrepancies === 1 ? 'y needs' : 'ies need'} review
+          </Text>
+          <Ionicons name="chevron-forward" size={16} color="#B91C1C" />
+        </TouchableOpacity>
+      )}
 
       {/* Welcome + low-stock alert */}
       <View style={styles.headerRow}>
@@ -174,6 +205,13 @@ const styles = StyleSheet.create({
   online: { backgroundColor: '#DCFCE7' },
   offline: { backgroundColor: '#FEE2E2' },
   statusText: { fontSize: 12, fontWeight: '500' },
+  discrepancyBanner: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: '#FEE2E2', borderColor: '#FCA5A5', borderWidth: 1,
+    marginHorizontal: 16, marginTop: 12, paddingHorizontal: 12, paddingVertical: 10,
+    borderRadius: 10,
+  },
+  discrepancyText: { flex: 1, fontSize: 13, fontWeight: '600', color: '#B91C1C' },
   headerRow: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8,

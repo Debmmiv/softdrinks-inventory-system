@@ -59,8 +59,8 @@ export async function loginApi(username: string, password: string): Promise<Logi
 export async function changePasswordApi(
   current_password: string,
   new_password: string
-): Promise<{ message: string }> {
-  const response = await apiClient.post<{ message: string }>('/auth/change-password', {
+): Promise<{ message: string; token?: string }> {
+  const response = await apiClient.post<{ message: string; token?: string }>('/auth/change-password', {
     current_password,
     new_password,
   });
@@ -115,5 +115,61 @@ export async function resetUserPasswordApi(user_id: string, new_temporary_passwo
     user_id,
     new_temporary_password,
   });
+  return response.data;
+}
+
+export interface DiscrepancyRecord {
+  id: string;
+  uuid: string;
+  status: 'OPEN' | 'RESOLVED';
+  transaction_type: 'DELIVERY' | 'RELEASE' | 'ADJUSTMENT';
+  total_bottles_delta: number;
+  /** What the recording device believed the stock would be after this transaction. */
+  device_expected_stock: number;
+  /** Central stock right after the server applied it. */
+  stock_after_sync: number | null;
+  device_id: string;
+  note: string | null;
+  created_at: string;
+  synced_at: string | null;
+  product: {
+    id: string;
+    name: string;
+    bottle_size: string;
+    units_per_case: number;
+    current_stock_bottles: number;
+  } | null;
+  recorded_by: { username: string; full_name: string } | null;
+  resolved_at: string | null;
+  resolved_by: { username: string; full_name: string } | null;
+  resolution_note: string | null;
+}
+
+export type DiscrepancyFilter = 'open' | 'resolved';
+
+/**
+ * Lists transactions flagged CONCURRENCY_DEFICIT for owner review. Owner only. (NFR13)
+ */
+export async function fetchDiscrepanciesApi(
+  status: DiscrepancyFilter = 'open'
+): Promise<{ open_count: number; discrepancies: DiscrepancyRecord[] }> {
+  const response = await apiClient.get<{ open_count: number; discrepancies: DiscrepancyRecord[] }>(
+    '/discrepancies',
+    { params: { status } }
+  );
+  return response.data;
+}
+
+/**
+ * Marks a flagged transaction as resolved with an audit note. Owner only. (NFR13)
+ */
+export async function resolveDiscrepancyApi(
+  id: string,
+  resolution_note: string
+): Promise<{ message: string; open_count: number }> {
+  const response = await apiClient.patch<{ message: string; open_count: number }>(
+    `/discrepancies/${id}`,
+    { resolution_note }
+  );
   return response.data;
 }

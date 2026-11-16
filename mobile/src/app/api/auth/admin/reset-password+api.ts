@@ -9,7 +9,7 @@ import { jsonOk, jsonError } from '../../../../server/middleware/response';
  * FR29: Owner reset forgotten staff password to a new temporary credential.
  */
 export async function POST(req: Request): Promise<Response> {
-  const auth = authenticate(req);
+  const auth = await authenticate(req);
   if (auth.errorResponse) return auth.errorResponse;
 
   const ownerCheck = requireOwner(auth.user!);
@@ -34,8 +34,14 @@ export async function POST(req: Request): Promise<Response> {
       return jsonError('User account not found.', 404);
     }
 
-    user.password_hash = await bcrypt.hash(new_temporary_password, 10);
-    await user.save();
+    // token_version bump kicks the target out of any session opened with the old password.
+    await User.updateOne(
+      { _id: user._id },
+      {
+        $set: { password_hash: await bcrypt.hash(new_temporary_password, 10) },
+        $inc: { token_version: 1 },
+      }
+    );
 
     return jsonOk({
       message: `Password for ${user.username} has been reset successfully.`,

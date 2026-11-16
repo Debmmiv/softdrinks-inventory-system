@@ -9,7 +9,7 @@ import { jsonOk, jsonError } from '../../../server/middleware/response';
  * Authenticated for both staff and owners.
  */
 export async function GET(req: Request): Promise<Response> {
-  const auth = authenticate(req);
+  const auth = await authenticate(req);
   if (auth.errorResponse) return auth.errorResponse;
 
   try {
@@ -38,7 +38,7 @@ export async function GET(req: Request): Promise<Response> {
  * Owner only.
  */
 export async function POST(req: Request): Promise<Response> {
-  const auth = authenticate(req);
+  const auth = await authenticate(req);
   if (auth.errorResponse) return auth.errorResponse;
 
   const ownerCheck = requireOwner(auth.user!);

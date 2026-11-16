@@ -30,6 +30,7 @@ const STANDARD_MENU_ITEMS: MenuItem[] = [
 
 const OWNER_MENU_ITEMS: MenuItem[] = [
   { label: 'Reports & Deficits', path: '/(owner)/reports', icon: 'analytics-outline' },
+  { label: 'Stock Discrepancies', path: '/(owner)/discrepancies', icon: 'warning-outline' },
   { label: 'Product Management', path: '/(owner)/products', icon: 'cube-outline' },
   { label: 'User Directory', path: '/(owner)/users', icon: 'people-outline' },
   { label: 'Enroll Staff', path: '/(owner)/users/enroll', icon: 'person-add-outline' },

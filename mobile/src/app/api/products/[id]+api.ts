@@ -13,7 +13,7 @@ export async function PATCH(
   req: Request,
   context?: { params?: { id?: string } }
 ): Promise<Response> {
-  const auth = authenticate(req);
+  const auth = await authenticate(req);
   if (auth.errorResponse) return auth.errorResponse;
 
   const ownerCheck = requireOwner(auth.user!);

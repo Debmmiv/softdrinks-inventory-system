@@ -3,7 +3,7 @@ import { useAuth } from '../../client/context/AuthContext';
 
 /**
  * Owner-Only Protected Stack Layout (FR4, NFR7)
- * Houses management screens: Reports, Products, Users, Staff Enrollment.
+ * Houses management screens: Reports, Stock Discrepancies, Products, Users, Staff Enrollment.
  * Restricts access strictly to authenticated users with the 'owner/manager' role.
  */
 export default function OwnerLayout() {
@@ -22,6 +22,7 @@ export default function OwnerLayout() {
       }}
     >
       <Stack.Screen name="reports" options={{ title: 'Reports & Analytics' }} />
+      <Stack.Screen name="discrepancies" options={{ title: 'Stock Discrepancies' }} />
       <Stack.Screen name="products/index" options={{ title: 'Product Management' }} />
       <Stack.Screen name="users/index" options={{ title: 'User Management' }} />
       <Stack.Screen name="users/enroll" options={{ title: 'Staff Enrollment' }} />

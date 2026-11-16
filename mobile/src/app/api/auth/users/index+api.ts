@@ -8,7 +8,7 @@ import { jsonOk, jsonError } from '../../../../server/middleware/response';
  * FR7: Retrieves list of all users and their status (Owner only).
  */
 export async function GET(req: Request): Promise<Response> {
-  const auth = authenticate(req);
+  const auth = await authenticate(req);
   if (auth.errorResponse) return auth.errorResponse;
 
   const ownerCheck = requireOwner(auth.user!);

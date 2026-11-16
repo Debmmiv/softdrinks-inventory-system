@@ -1,7 +1,7 @@
 import bcrypt from 'bcryptjs';
 import { connectToDatabase } from '../../../server/config/db';
 import { User } from '../../../server/models/User';
-import { authenticate } from '../../../server/middleware/auth';
+import { authenticate, signToken } from '../../../server/middleware/auth';
 import { jsonOk, jsonError } from '../../../server/middleware/response';
 
 /**
@@ -9,7 +9,7 @@ import { jsonOk, jsonError } from '../../../server/middleware/response';
  * FR28: Allows staff or owner to self-serve change their password.
  */
 export async function POST(req: Request): Promise<Response> {
-  const auth = authenticate(req);
+  const auth = await authenticate(req);
   if (auth.errorResponse) return auth.errorResponse;
 
   try {
@@ -36,10 +36,25 @@ export async function POST(req: Request): Promise<Response> {
       return jsonError('Current password is incorrect.', 400);
     }
 
-    user.password_hash = await bcrypt.hash(new_password, 10);
-    await user.save();
+    // Bumping token_version signs the account out everywhere else; this device gets a fresh token.
+    const updated = await User.findByIdAndUpdate(
+      user._id,
+      {
+        $set: { password_hash: await bcrypt.hash(new_password, 10) },
+        $inc: { token_version: 1 },
+      },
+      { returnDocument: 'after' }
+    );
+    if (!updated) {
+      return jsonError('User account not found.', 404);
+    }
 
-    return jsonOk({ message: 'Password updated successfully.' });
+    const token = signToken(
+      { id: updated._id.toString(), username: updated.username, role: updated.role },
+      updated.token_version ?? 0
+    );
+
+    return jsonOk({ message: 'Password updated successfully.', token });
   } catch (error) {
     return jsonError(
       'Failed to update password.',

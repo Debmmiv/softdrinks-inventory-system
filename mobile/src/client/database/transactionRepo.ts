@@ -30,16 +30,15 @@ export async function recordTransaction(
   const created_at = nowISO();
   const delta = toTotalBottles(input.cases, input.loose_bottles, productUnitsPerCase);
 
-  // For RELEASE and negative ADJUSTMENT, delta becomes negative
+  // DELIVERY adds stock and RELEASE removes it, so both are entered as positive quantities.
+  // ADJUSTMENT quantities arrive already signed from the UI (positive = gain, negative = loss),
+  // so `delta` is already correct. (Previously a loss was negated a second time and recorded as a gain.)
   const signed_delta =
     input.transaction_type === 'DELIVERY'
       ? delta
       : input.transaction_type === 'RELEASE'
         ? -delta
-        : input.cases >= 0 && input.loose_bottles >= 0
-          ? // ADJUSTMENT: positive input = stock gain, negative = loss (UI sends signed values)
-            delta
-          : -delta;
+        : delta;
 
   const resulting_stock = currentStockBottles + signed_delta;
 
@@ -157,6 +156,23 @@ export async function markFailed(uuid: string, error: string): Promise<void> {
          error_message = ?
      WHERE transaction_uuid = ?`,
     [error, uuid]
+  );
+}
+
+/**
+ * Puts SYNCING items back to PENDING without counting a retry. Used when the upload was
+ * refused because the login session is invalid (expired / revoked) — the records themselves
+ * are fine and must be sent again after the user signs in online.
+ */
+export async function releaseToPending(uuids: string[], message: string): Promise<void> {
+  if (uuids.length === 0) return;
+  const db = await getDatabase();
+  const placeholders = uuids.map(() => '?').join(',');
+  await db.runAsync(
+    `UPDATE ${TABLES.SYNC_QUEUE}
+     SET status = 'PENDING', error_message = ?
+     WHERE transaction_uuid IN (${placeholders}) AND status = 'SYNCING'`,
+    [message, ...uuids]
   );
 }
 

@@ -35,7 +35,8 @@
           "enableFTS": false,
           "useSQLCipher": false
         }
-      ]
+      ],
+      "expo-status-bar"
     ],
     "experiments": {
       "typedRoutes": true

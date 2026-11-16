@@ -14,6 +14,19 @@ export interface ITransaction extends Document {
   remarks?: string | null;
   reference_tag?: string | null;
   discrepancy_flag?: 'CONCURRENCY_DEFICIT' | null;
+  /** Review state of a flagged transaction. A missing value on a flagged record means OPEN. */
+  discrepancy_status?: 'OPEN' | 'RESOLVED' | null;
+  /** Server-generated explanation of why the record was flagged. */
+  discrepancy_note?: string | null;
+  resolved_by?: mongoose.Types.ObjectId | null;
+  resolved_at?: Date | null;
+  resolution_note?: string | null;
+  /** Central stock (bottles) immediately after this transaction was applied. */
+  stock_after_sync?: number | null;
+  /** Account whose session uploaded the record (may differ from user_id on a shared phone). */
+  synced_by?: mongoose.Types.ObjectId | null;
+  /** Server clock at the moment the record was accepted (created_at is device-supplied). */
+  synced_at?: Date | null;
   created_at: Date;
 }
 
@@ -81,6 +94,18 @@ const TransactionSchema = new Schema<ITransaction>(
       enum: ['CONCURRENCY_DEFICIT', null],
       default: null,
     },
+    discrepancy_status: {
+      type: String,
+      enum: ['OPEN', 'RESOLVED', null],
+      default: null,
+    },
+    discrepancy_note: { type: String, default: null },
+    resolved_by: { type: Schema.Types.ObjectId, ref: 'User', default: null },
+    resolved_at: { type: Date, default: null },
+    resolution_note: { type: String, default: null },
+    stock_after_sync: { type: Number, default: null },
+    synced_by: { type: Schema.Types.ObjectId, ref: 'User', default: null },
+    synced_at: { type: Date, default: null },
     created_at: {
       type: Date,
       required: true,
@@ -92,6 +117,9 @@ const TransactionSchema = new Schema<ITransaction>(
     versionKey: false,
   }
 );
+
+// Owner review queue lookups (open / resolved discrepancies, newest first)
+TransactionSchema.index({ discrepancy_flag: 1, discrepancy_status: 1, created_at: -1 });
 
 export const Transaction: Model<ITransaction> =
   mongoose.models.Transaction ||

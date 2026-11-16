@@ -5,6 +5,7 @@ import {
   markSyncing,
   markSynced,
   markFailed,
+  releaseToPending,
   getPendingCount,
 } from '../database/transactionRepo';
 import { upsertProduct } from '../database/productRepo';
@@ -12,6 +13,9 @@ import { uploadBatchApi, fetchDownstreamApi } from '../api/syncApi';
 import { networkService } from './networkService';
 
 const STORAGE_LAST_SYNC_KEY = 'last_downstream_sync_timestamp';
+
+export const SESSION_INVALID_MESSAGE =
+  'Your session has expired or was revoked. Log in again while online to resume syncing. Your records are safe on this device.';
 
 export interface SyncResult {
   success: boolean;
@@ -58,6 +62,14 @@ class SyncEngine {
         failedCount: response.failed.length,
       };
     } catch (err) {
+      // 401 = the session is invalid (expired token, deactivated account, password reset).
+      // The transactions are not at fault, so keep them PENDING instead of burning retries.
+      const httpStatus = (err as { response?: { status?: number } })?.response?.status;
+      if (httpStatus === 401) {
+        await releaseToPending(uuids, SESSION_INVALID_MESSAGE);
+        return { syncedCount: 0, failedCount: 0, error: SESSION_INVALID_MESSAGE };
+      }
+
       const errorMsg =
         err instanceof Error ? err.message : 'Network error occurred during batch sync.';
 
@@ -154,7 +166,7 @@ class SyncEngine {
       await this.syncDownstream(onProductUpdated);
 
       return {
-        success: upstream.failedCount === 0,
+        success: upstream.failedCount === 0 && !upstream.error,
         syncedCount: upstream.syncedCount,
         failedCount: upstream.failedCount,
         errorMessage: upstream.error,

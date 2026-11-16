@@ -34,11 +34,14 @@ export async function POST(req: Request): Promise<Response> {
       return jsonError('Invalid username or password.', 401);
     }
 
-    const token = signToken({
-      id: user._id.toString(),
-      username: user.username,
-      role: user.role,
-    });
+    const token = signToken(
+      {
+        id: user._id.toString(),
+        username: user.username,
+        role: user.role,
+      },
+      user.token_version ?? 0
+    );
 
     return jsonOk({
       token,

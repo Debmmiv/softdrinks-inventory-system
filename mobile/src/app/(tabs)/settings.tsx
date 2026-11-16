@@ -13,12 +13,13 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import * as SecureStore from 'expo-secure-store';
 import { hashPasswordLocally } from '../../client/utils/crypto';
 import { useAuth } from '../../client/context/AuthContext';
 import { useSync } from '../../client/context/SyncContext';
 import { changePasswordApi } from '../../client/api/syncApi';
 import { getDatabase } from '../../client/database/db';
-import { TABLES } from '../../client/utils/constants';
+import { TABLES, STORAGE_KEYS } from '../../client/utils/constants';
 
 /**
  * Settings / Profile Screen (FR5, FR28, NFR7, NFR8, NFR12)
@@ -80,7 +81,12 @@ export default function SettingsScreen() {
 
     setUpdating(true);
     try {
-      await changePasswordApi(currentPassword, newPassword);
+      const result = await changePasswordApi(currentPassword, newPassword);
+
+      // The server revokes older tokens on a password change and returns a fresh one for this device.
+      if (result.token) {
+        await SecureStore.setItemAsync(STORAGE_KEYS.SESSION_TOKEN, result.token);
+      }
 
       // Update local SQLite users_cache so future offline logins work with new password
       if (user?.id) {

@@ -11,7 +11,7 @@ export async function PATCH(
   req: Request,
   context?: { params?: { id?: string } }
 ): Promise<Response> {
-  const auth = authenticate(req);
+  const auth = await authenticate(req);
   if (auth.errorResponse) return auth.errorResponse;
 
   const ownerCheck = requireOwner(auth.user!);
@@ -35,11 +35,14 @@ export async function PATCH(
       return jsonError('You cannot deactivate your own owner account.', 400);
     }
 
-    const updatedUser = await User.findByIdAndUpdate(
-      userId,
-      { is_active: body.is_active },
-      { returnDocument: 'after', select: '-password_hash' }
-    );
+    const update = body.is_active
+      ? { $set: { is_active: true } }
+      : { $set: { is_active: false }, $inc: { token_version: 1 } };
+
+    const updatedUser = await User.findByIdAndUpdate(userId, update, {
+      returnDocument: 'after',
+      select: '-password_hash',
+    });
 
     if (!updatedUser) {
       return jsonError('User account not found.', 404);
