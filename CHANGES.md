@@ -1,5 +1,50 @@
 # Fix Pack: What Changed
 
+# Hardening changes: sync integrity, session security, discrepancy review
+
+## 1. Sync integrity (`mobile/src/app/api/sync/batch+api.ts`)
+- Stock update and ledger insert now commit together in one MongoDB transaction. A retried or
+  concurrent duplicate `uuid` is rejected by the unique index, its stock change rolls back, and the
+  record is reported as synced. Stock changes once. (Requires a replica set; every Atlas cluster is one.)
+- Each record is validated against the product's pack size: `|delta| = cases x units_per_case + loose`,
+  sign must match the type, a breakage/damage/loss adjustment cannot add stock. Failures are returned
+  in `failed[]` with a readable reason.
+- `CONCURRENCY_DEFICIT` is raised only when a movement that removes stock leaves central stock below zero.
+  Records now store `discrepancy_status`, `discrepancy_note`, `stock_after_sync`, `synced_by`, `synced_at`.
+- `user_id` from the device is honoured only if it is a real account (shared-phone queues); otherwise the
+  uploading session's id is used. `synced_by` always records who uploaded.
+- Batches above 200 records are refused.
+
+## 2. Session security (`server/middleware/auth.ts` and auth routes)
+- `authenticate()` is now async and checks MongoDB on every request: account exists, is active,
+  `token_version` matches. Role comes from the database, not the token.
+- `token_version` (new `User` field, default 0) is bumped on password reset, password change and
+  deactivation, which invalidates every older token. Password change returns a fresh token for the device.
+- Default token life 30d -> 7d, configurable with `JWT_EXPIRES_IN`.
+- Tokens issued before this change have no `tv` claim and count as version 0, so nobody is logged out by
+  the upgrade itself.
+- Missing `JWT_SECRET` now returns 500 instead of masquerading as an invalid token.
+
+## 3. Discrepancy review
+- `GET /api/discrepancies?status=open|resolved|all` and `PATCH /api/discrepancies/:id` (owner only,
+  resolution note required; the ledger row itself is never edited).
+- Owner screen `(owner)/discrepancies.tsx`, menu entry, and a dashboard banner showing the open count.
+- A 401 during sync keeps transactions PENDING (no retry burned) and tells the user to log in again.
+
+## 4. Bug fix found during verification
+`recordTransaction` negated signed adjustment quantities a second time, so **breakage / damage / loss
+adjustments were recorded as stock gains**. Fixed in `client/database/transactionRepo.ts`; the server now
+also rejects the contradiction. To find records already affected in Atlas:
+
+```js
+db.transactions.find({
+  transaction_type: 'ADJUSTMENT',
+  reason: { $in: ['breakage', 'damage', 'loss'] },
+  total_bottles_delta: { $gt: 0 }
+})
+```
+Correct each product's stock with a Count Correction after a physical count.
+
 ## Bugs fixed
 1. **Stock overwrite on sync** (`syncEngine.ts`, `calculations.ts`, `transactionRepo.ts`)
    Pulling the catalog used to replace local stock with the server total, erasing the phone's own
