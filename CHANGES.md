@@ -133,3 +133,4 @@ Correct each product's stock with a Count Correction after a physical count.
 - `/api/sync/downstream` still returns the whole active catalog. The phone's cleanup logic relies
   on seeing the full list, so adding `since` filtering would need a client change as well.
 - The login throttle is in server memory. Fine for one server; use a shared store if you run several.
+
