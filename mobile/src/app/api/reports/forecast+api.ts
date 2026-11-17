@@ -115,12 +115,8 @@ export async function GET(req: Request): Promise<Response> {
         totalReleased = release.total_released_bottles;
         releaseCount = release.transaction_count;
 
-        // Use actual active days (from earliest to latest release, or lookback if only 1 tx)
-        const activeDays = releaseCount > 1
-          ? Math.max(1, Math.ceil((release.latest.getTime() - release.earliest.getTime()) / (24 * 60 * 60 * 1000)))
-          : lookbackDays;
-
-        avgDailyBottles = totalReleased / activeDays;
+        // Average daily consumption based on the selected lookback window
+        avgDailyBottles = totalReleased / lookbackDays;
       }
 
       // Days until stockout (at current rate)
