@@ -45,10 +45,6 @@ db.transactions.find({
 ```
 Correct each product's stock with a Count Correction after a physical count.
 
-## Not covered here
-Backups, forecasting, login rate limiting/lockout, password length (still 6), and enforcing
-`MAX_SYNC_RETRIES` (defined but unused: FAILED items are retried on every sync).
-
 ## Bugs fixed
 1. **Stock overwrite on sync** (`syncEngine.ts`, `calculations.ts`, `transactionRepo.ts`)
    Pulling the catalog used to replace local stock with the server total, erasing the phone's own
