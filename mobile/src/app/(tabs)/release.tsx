@@ -19,7 +19,7 @@ import { toTotalBottles, formatStock, isValidQuantity } from '../../client/utils
 export default function ReleaseScreen() {
   const { user, deviceId } = useAuth();
   const { products, refresh } = useInventory();
-  const { refreshPendingCount } = useSync();
+  const { refreshPendingCount, isOnline, syncNow } = useSync();
 
   const [selectedProductId, setSelectedProductId] = useState('');
   const [cases, setCases] = useState('');
@@ -75,6 +75,11 @@ export default function ReleaseScreen() {
       );
 
       await Promise.all([refresh(), refreshPendingCount()]);
+
+      // If online, immediately sync to cloud in the background
+      if (isOnline) {
+        syncNow().catch((err) => console.warn('[Release] Background sync error:', err));
+      }
 
       setCases('');
       setLooseBottles('');

@@ -20,7 +20,7 @@ import { toTotalBottles, formatStock, isValidQuantity } from '../../client/utils
 export default function DeliveryScreen() {
   const { user, deviceId } = useAuth();
   const { products, refresh } = useInventory();
-  const { refreshPendingCount } = useSync();
+  const { refreshPendingCount, isOnline, syncNow } = useSync();
 
   const [selectedProductId, setSelectedProductId] = useState('');
   const [cases, setCases] = useState('');
@@ -65,6 +65,11 @@ export default function DeliveryScreen() {
       );
 
       await Promise.all([refresh(), refreshPendingCount()]);
+
+      // If online, immediately sync to cloud in the background
+      if (isOnline) {
+        syncNow().catch((err) => console.warn('[Delivery] Background sync error:', err));
+      }
 
       // Reset form
       setCases('');

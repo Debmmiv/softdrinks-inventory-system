@@ -22,7 +22,7 @@ import type { AdjustmentReason } from '../../client/types/transaction';
 export default function AdjustmentScreen() {
   const { user, deviceId } = useAuth();
   const { products, refresh } = useInventory();
-  const { refreshPendingCount } = useSync();
+  const { refreshPendingCount, isOnline, syncNow } = useSync();
 
   const [selectedProductId, setSelectedProductId] = useState('');
   const [cases, setCases] = useState('');
@@ -77,6 +77,12 @@ export default function AdjustmentScreen() {
       );
 
       await Promise.all([refresh(), refreshPendingCount()]);
+
+      // If online, immediately sync to cloud in the background
+      if (isOnline) {
+        syncNow().catch((err) => console.warn('[Adjustment] Background sync error:', err));
+      }
+
       setCases(''); setLooseBottles(''); setReason(''); setRemarks(''); setSelectedProductId('');
 
       Alert.alert(
