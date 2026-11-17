@@ -3,6 +3,11 @@ import { Product } from '../../../server/models/Product';
 import { authenticate, requireOwner } from '../../../server/middleware/auth';
 import { jsonOk, jsonError } from '../../../server/middleware/response';
 
+/** Escapes user text so it can be used literally inside a RegExp (prevents regex injection). */
+function escapeRegex(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 /**
  * GET /api/products
  * FR8, FR27: Fetches soft drinks product catalog.
@@ -74,13 +79,17 @@ export async function POST(req: Request): Promise<Response> {
       return jsonError('reorder_threshold_bottles must be an integer >= 0.', 400);
     }
 
+    if (!Number.isInteger(initial_stock_bottles) || initial_stock_bottles < 0) {
+      return jsonError('initial_stock_bottles must be an integer >= 0.', 400);
+    }
+
     await connectToDatabase();
 
     // Check for duplicate product with identical brand, product name, and bottle size
     const existing = await Product.findOne({
-      brand_name: { $regex: new RegExp(`^${brand_name.trim()}$`, 'i') },
-      product_name: { $regex: new RegExp(`^${product_name.trim()}$`, 'i') },
-      bottle_size: { $regex: new RegExp(`^${bottle_size.trim()}$`, 'i') },
+      brand_name: { $regex: new RegExp(`^${escapeRegex(String(brand_name).trim())}$`, 'i') },
+      product_name: { $regex: new RegExp(`^${escapeRegex(String(product_name).trim())}$`, 'i') },
+      bottle_size: { $regex: new RegExp(`^${escapeRegex(String(bottle_size).trim())}$`, 'i') },
     });
 
     if (existing) {

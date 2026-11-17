@@ -6,13 +6,20 @@ import {
   markSynced,
   markFailed,
   releaseToPending,
-  getPendingCount,
+  resetStuckSyncing,
+  getPendingDeltaForProduct,
 } from '../database/transactionRepo';
 import { upsertProduct } from '../database/productRepo';
 import { uploadBatchApi, fetchDownstreamApi } from '../api/syncApi';
 import { networkService } from './networkService';
+import { reconcileLocalStock } from '../utils/calculations';
 
 const STORAGE_LAST_SYNC_KEY = 'last_downstream_sync_timestamp';
+
+/** Items per upload request (NFR6). */
+const BATCH_SIZE = 100;
+/** Safety valve: at most this many upload requests in one sync cycle. */
+const MAX_BATCH_ROUNDS = 20;
 
 export const SESSION_INVALID_MESSAGE =
   'Your session has expired or was revoked. Log in again while online to resume syncing. Your records are safe on this device.';
@@ -29,83 +36,114 @@ class SyncEngine {
   private syncListeners: Set<(isSyncing: boolean) => void> = new Set();
 
   /**
-   * Pushes all PENDING / FAILED local transactions to MongoDB Atlas. (FR18, FR20, FR21, NFR3)
+   * Pushes all PENDING / retryable FAILED local transactions to MongoDB Atlas, in FIFO batches,
+   * until the queue is empty. (FR18, FR20, FR21, NFR3)
+   *
+   * Retry rules:
+   *  - Server REJECTED the record (validation failure)  -> FAILED, retry counter +1.
+   *  - Network down / timeout / 5xx / 429                -> back to PENDING, counter untouched,
+   *    so a flaky connection can never use up a transaction's retries.
+   *  - 401 (expired or revoked session)                  -> back to PENDING, counter untouched.
    */
   async syncUpstream(): Promise<{ syncedCount: number; failedCount: number; error?: string }> {
-    const queue = await getPendingQueue();
-    if (queue.length === 0) {
-      return { syncedCount: 0, failedCount: 0 };
-    }
+    // Crash recovery: rows left SYNCING by an app kill would otherwise never be sent again.
+    await resetStuckSyncing();
 
-    // Limit to batch size of 100 items (NFR6)
-    const batchItems = queue.slice(0, 100);
-    const uuids = batchItems.map((item) => item.transaction_uuid);
+    let syncedCount = 0;
+    let failedCount = 0;
+    // Items already tried in this cycle (so a server-rejected item is not resent immediately).
+    const attempted = new Set<string>();
 
-    // Mark as SYNCING to prevent parallel duplicate calls
-    await Promise.all(uuids.map((u) => markSyncing(u)));
+    for (let round = 0; round < MAX_BATCH_ROUNDS; round++) {
+      const queue = (await getPendingQueue()).filter((i) => !attempted.has(i.transaction_uuid));
+      if (queue.length === 0) break;
 
-    try {
-      const transactions = await getTransactionsByUuids(uuids);
+      const uuids = queue.slice(0, BATCH_SIZE).map((item) => item.transaction_uuid);
+      uuids.forEach((u) => attempted.add(u));
 
-      const response = await uploadBatchApi({ transactions });
+      // Mark as SYNCING to prevent parallel duplicate calls
+      await Promise.all(uuids.map((u) => markSyncing(u)));
 
-      // Mark successful transactions as SYNCED
-      await Promise.all(response.synced.map((uuid) => markSynced(uuid)));
+      try {
+        const transactions = await getTransactionsByUuids(uuids);
+        const response = await uploadBatchApi({ transactions });
 
-      // Mark rejected transactions as FAILED
-      await Promise.all(
-        response.failed.map((f) => markFailed(f.uuid, f.reason || 'Server rejected transaction.'))
-      );
+        await Promise.all(response.synced.map((uuid) => markSynced(uuid)));
+        await Promise.all(
+          response.failed.map((f) => markFailed(f.uuid, f.reason || 'Server rejected transaction.'))
+        );
 
-      return {
-        syncedCount: response.synced.length,
-        failedCount: response.failed.length,
-      };
-    } catch (err) {
-      // 401 = the session is invalid (expired token, deactivated account, password reset).
-      // The transactions are not at fault, so keep them PENDING instead of burning retries.
-      const httpStatus = (err as { response?: { status?: number } })?.response?.status;
-      if (httpStatus === 401) {
-        await releaseToPending(uuids, SESSION_INVALID_MESSAGE);
-        return { syncedCount: 0, failedCount: 0, error: SESSION_INVALID_MESSAGE };
+        // Anything the server neither confirmed nor rejected (e.g. a temporary server error on
+        // that one record) goes back to PENDING without costing a retry.
+        const handled = new Set([...response.synced, ...response.failed.map((f) => f.uuid)]);
+        const leftover = uuids.filter((u) => !handled.has(u));
+        if (leftover.length > 0) {
+          await releaseToPending(leftover, 'Server could not process this record yet. Will retry.');
+        }
+
+        syncedCount += response.synced.length;
+        failedCount += response.failed.length;
+      } catch (err) {
+        const httpStatus = (err as { response?: { status?: number } })?.response?.status;
+
+        if (httpStatus === 401) {
+          await releaseToPending(uuids, SESSION_INVALID_MESSAGE);
+          return { syncedCount, failedCount, error: SESSION_INVALID_MESSAGE };
+        }
+
+        const errorMsg =
+          err instanceof Error ? err.message : 'Network error occurred during batch sync.';
+
+        const transient =
+          httpStatus === undefined || httpStatus >= 500 || httpStatus === 408 || httpStatus === 429;
+
+        if (transient) {
+          await releaseToPending(uuids, errorMsg);
+          return { syncedCount, failedCount, error: errorMsg };
+        }
+
+        // Other 4xx: the request itself was refused. Count it as a failed attempt.
+        await Promise.all(uuids.map((u) => markFailed(u, errorMsg)));
+        return { syncedCount, failedCount: failedCount + uuids.length, error: errorMsg };
       }
-
-      const errorMsg =
-        err instanceof Error ? err.message : 'Network error occurred during batch sync.';
-
-      // On request failure, return items to FAILED status so they can be retried
-      await Promise.all(uuids.map((u) => markFailed(u, errorMsg)));
-
-      return {
-        syncedCount: 0,
-        failedCount: uuids.length,
-        error: errorMsg,
-      };
     }
+
+    return { syncedCount, failedCount };
   }
 
   /**
-   * Pulls newly added/updated products and authoritative stock levels from MongoDB Atlas. (FR23, FR31)
+   * Pulls the authoritative catalog and stock levels from MongoDB Atlas. (FR23, FR31)
+   *
+   * Stock shown on the phone = server total + this phone's not-yet-confirmed transactions, so
+   * pulling the catalog never erases the staff's own unsynced work.
    */
   async syncDownstream(onProductUpdated?: () => Promise<void>): Promise<number> {
     try {
       const lastSync = await SecureStore.getItemAsync(STORAGE_LAST_SYNC_KEY);
       const response = await fetchDownstreamApi(lastSync);
 
-      if (response.products && response.products.length > 0) {
-        // Clean out legacy mock products & prune stale duplicate products not in Atlas
+      if (Array.isArray(response.products)) {
+        // Clean out legacy mock products & prune stale products that are no longer in Atlas.
+        // Rows referenced by local transactions are kept (foreign key), only hidden.
         try {
           const { getDatabase } = await import('../database/db');
           const db = await getDatabase();
-          await db.runAsync(`DELETE FROM products WHERE id LIKE 'mock-prod-%'`);
-
-          // Deactivate or delete local products no longer present in cloud catalog
-          const activeIds = response.products.map((p) => p._id);
-          const placeholders = activeIds.map(() => '?').join(',');
           await db.runAsync(
-            `UPDATE products SET is_active = 0 WHERE id NOT IN (${placeholders})`,
-            activeIds
+            `DELETE FROM products
+             WHERE id LIKE 'mock-prod-%'
+               AND id NOT IN (SELECT DISTINCT product_id FROM transactions)`
           );
+
+          const activeIds = response.products.map((p) => p._id);
+          if (activeIds.length === 0) {
+            await db.runAsync(`UPDATE products SET is_active = 0`);
+          } else {
+            const placeholders = activeIds.map(() => '?').join(',');
+            await db.runAsync(
+              `UPDATE products SET is_active = 0 WHERE id NOT IN (${placeholders})`,
+              activeIds
+            );
+          }
           await db.runAsync(
             `DELETE FROM products WHERE is_active = 0 AND id NOT IN (SELECT DISTINCT product_id FROM transactions)`
           );
@@ -114,6 +152,8 @@ class SyncEngine {
         }
 
         for (const p of response.products) {
+          // Read the pending delta right before writing to keep the race window tiny.
+          const pendingDelta = await getPendingDeltaForProduct(p._id);
           await upsertProduct({
             id: p._id,
             brand_name: p.brand_name,
@@ -121,7 +161,7 @@ class SyncEngine {
             bottle_size: p.bottle_size,
             units_per_case: p.units_per_case,
             reorder_threshold_bottles: p.reorder_threshold_bottles,
-            local_stock_bottles: p.total_stock_bottles,
+            local_stock_bottles: reconcileLocalStock(p.total_stock_bottles, pendingDelta),
             is_active: p.is_active,
             updated_at: p.updated_at,
           });

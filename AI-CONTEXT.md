@@ -47,7 +47,7 @@
 1. **Unit of Record:**
    - All inventory is internally stored and calculated as **total raw bottles**:
      $$\text{total\_bottles} = (\text{cases} \times \text{units\_per\_case}) + \text{loose\_bottles}$$
-   - Displayed everywhere in UI using [`toCasesAndBottles()`](file:///D:/softdrinks-app/softdrinks-inventory-system/mobile/src/client/utils/calculations.ts) as `"X cases and Y bottles"`.
+   - Displayed everywhere in UI using [`toCasesAndBottles()`](mobile/src/client/utils/calculations.ts) as `"X cases and Y bottles"`.
 2. **Pack Size Immutability (FR9):**
    - Once a product has at least one recorded transaction, its `units_per_case` pack size attribute is **IMMUTABLE**. Never allow updating `units_per_case` if transactions exist.
 3. **Append-Only Ledger (FR24):**

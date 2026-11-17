@@ -25,4 +25,5 @@ export interface BatchSyncPayload {
 export interface BatchSyncResponse {
   synced: string[];  // UUIDs successfully committed to MongoDB
   failed: { uuid: string; reason: string }[];
+  deferred?: string[]; // temporary server problem: retry later without using up retries
 }

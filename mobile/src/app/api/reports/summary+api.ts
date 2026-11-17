@@ -80,6 +80,7 @@ export async function GET(req: Request): Promise<Response> {
               ')',
             ],
           },
+          units_per_case: { $ifNull: ['$product.units_per_case', 1] },
           transaction_type: '$_id.transaction_type',
           total_cases: 1,
           total_loose_bottles: 1,

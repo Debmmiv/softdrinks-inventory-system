@@ -30,25 +30,9 @@ interface IncomingTx {
 /** Hard ceiling per request; the app itself sends at most 100 (NFR6). */
 const MAX_BATCH_SIZE = 200;
 
-const MOCK_NAME_MAP: Record<string, string> = {
-  'mock-prod-001': 'Coca-Cola Glass Bottle',
-  'mock-prod-002': 'Sprite',
-  'mock-prod-003': 'Pepsi Cola',
-  'mock-prod-004': 'Royal Tru-Orange',
-  'mock-prod-005': 'Coke Mismo',
-};
-
-/** Resolves legacy mock product ids to real Atlas ids; returns null if the id is unusable. */
-async function resolveProductId(rawId: string): Promise<string | null> {
-  let id = rawId;
-  if (id.startsWith('mock-prod-')) {
-    const name = MOCK_NAME_MAP[id];
-    if (name) {
-      const found = await Product.findOne({ product_name: name }).select('_id');
-      if (found) id = found._id.toString();
-    }
-  }
-  return mongoose.Types.ObjectId.isValid(id) ? id : null;
+/** Returns the id when it is a valid Mongo ObjectId, otherwise null. */
+function resolveProductId(rawId: unknown): string | null {
+  return typeof rawId === 'string' && mongoose.Types.ObjectId.isValid(rawId) ? rawId : null;
 }
 
 /**
@@ -174,12 +158,20 @@ export async function POST(req: Request): Promise<Response> {
 
     const synced: string[] = [];
     const failed: { uuid: string; reason: string }[] = [];
+    // Temporary server-side problems: not the transaction's fault, so the client retries
+    // these later without using up their retry allowance.
+    const deferred: string[] = [];
     let flaggedCount = 0;
 
     // Process sequentially in FIFO order (FR18)
     for (const tx of transactions) {
       try {
-        if (!tx?.uuid || !tx.product_id || tx.total_bottles_delta === undefined) {
+        if (
+          typeof tx?.uuid !== 'string' ||
+          !tx.uuid ||
+          !tx.product_id ||
+          tx.total_bottles_delta === undefined
+        ) {
           failed.push({ uuid: tx?.uuid || 'unknown', reason: 'Missing required transaction fields.' });
           continue;
         }
@@ -190,7 +182,7 @@ export async function POST(req: Request): Promise<Response> {
           continue;
         }
 
-        const productId = await resolveProductId(tx.product_id);
+        const productId = resolveProductId(tx.product_id);
         if (!productId) {
           failed.push({ uuid: tx.uuid, reason: `Invalid product_id: ${tx.product_id}` });
           continue;
@@ -218,16 +210,15 @@ export async function POST(req: Request): Promise<Response> {
         synced.push(tx.uuid);
         if (result.flagged) flaggedCount++;
       } catch (itemError) {
-        failed.push({
-          uuid: tx?.uuid || 'unknown',
-          reason: itemError instanceof Error ? itemError.message : String(itemError),
-        });
+        console.error('[sync/batch] Unexpected error applying transaction', tx?.uuid, itemError);
+        if (typeof tx?.uuid === 'string' && tx.uuid) deferred.push(tx.uuid);
       }
     }
 
     return jsonOk({
       synced,
       failed,
+      deferred,
       processed_count: transactions.length,
       synced_count: synced.length,
       failed_count: failed.length,

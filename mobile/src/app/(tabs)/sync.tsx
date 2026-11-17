@@ -10,7 +10,8 @@ import {
   RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { getAllQueueItems } from '../../client/database/transactionRepo';
+import { getAllQueueItems, retryPermanentFailures } from '../../client/database/transactionRepo';
+import { MAX_SYNC_RETRIES } from '../../client/utils/constants';
 import { useSync } from '../../client/context/SyncContext';
 import { formatDisplayDate } from '../../client/utils/date';
 import type { QueueItem } from '../../client/types/sync';
@@ -81,6 +82,14 @@ export default function SyncScreen() {
   const pending = items.filter((i) => i.status === 'PENDING').length;
   const synced = items.filter((i) => i.status === 'SYNCED').length;
   const failed = items.filter((i) => i.status === 'FAILED').length;
+  const parked = items.filter(
+    (i) => i.status === 'FAILED' && i.retry_count >= MAX_SYNC_RETRIES
+  ).length;
+
+  async function handleRetryParked() {
+    await retryPermanentFailures();
+    await handleManualSync();
+  }
 
   return (
     <View style={styles.container}>
@@ -127,6 +136,18 @@ export default function SyncScreen() {
           </>
         )}
       </TouchableOpacity>
+
+      {parked > 0 && (
+        <View style={styles.parkedBox}>
+          <Text style={styles.parkedText}>
+            {parked} transaction(s) were rejected {MAX_SYNC_RETRIES} times and stopped retrying. Your
+            records are safe on this device. Check the error below, then retry or ask the owner.
+          </Text>
+          <TouchableOpacity onPress={handleRetryParked} disabled={isSyncing} style={styles.parkedBtn}>
+            <Text style={styles.parkedBtnText}>Retry Stopped Items</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Outbox List Section */}
       <View style={styles.queueHeaderRow}>
@@ -263,6 +284,24 @@ const styles = StyleSheet.create({
   },
   listHeader: { fontSize: 11, fontWeight: '700', color: '#64748B', letterSpacing: 1 },
   refreshIconBtn: { padding: 4 },
+  parkedBox: {
+    backgroundColor: '#FEF2F2',
+    borderColor: '#FCA5A5',
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 16,
+    gap: 8,
+  },
+  parkedText: { fontSize: 12, color: '#991B1B' },
+  parkedBtn: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#DC2626',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  parkedBtnText: { color: '#fff', fontSize: 12, fontWeight: '700' },
   list: { paddingBottom: 32 },
   emptyContainer: { alignItems: 'center', marginTop: 48, gap: 10 },
   empty: { textAlign: 'center', color: '#94A3B8', fontSize: 14 },

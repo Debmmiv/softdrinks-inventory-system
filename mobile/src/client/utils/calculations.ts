@@ -38,3 +38,15 @@ export function isValidQuantity(cases: number, looseBottles: number): boolean {
     looseBottles >= 0 &&
     cases + looseBottles > 0;
 }
+
+/**
+ * What the phone should display for a product after a downstream sync.
+ *
+ * The server total only contains transactions the server has already applied. Anything still
+ * waiting in the local outbox (PENDING / FAILED / SYNCING) has not been counted by the server
+ * yet, so its delta is added back on top. Without this, a downstream sync would overwrite the
+ * phone's stock with a number that ignores the staff's own unsynced work.
+ */
+export function reconcileLocalStock(serverStockBottles: number, pendingDeltaBottles: number): number {
+  return serverStockBottles + pendingDeltaBottles;
+}

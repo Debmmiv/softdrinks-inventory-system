@@ -3,7 +3,7 @@ import { updateLocalStock } from './productRepo';
 import type { Transaction, NewTransactionInput } from '../types/transaction';
 import type { QueueItem } from '../types/sync';
 import { nowISO } from '../utils/date';
-import { TABLES } from '../utils/constants';
+import { TABLES, MAX_SYNC_RETRIES } from '../utils/constants';
 import { toTotalBottles } from '../utils/calculations';
 import * as Crypto from 'expo-crypto';
 
@@ -108,14 +108,71 @@ export async function getTransactionsByProduct(productId: string): Promise<Trans
   );
 }
 
-/** Returns PENDING and FAILED items for the sync engine and SyncQueueScreen. */
+/**
+ * Returns the items the sync engine should send now: every PENDING item, plus FAILED items
+ * that still have retries left. Items that exhausted MAX_SYNC_RETRIES are parked until the
+ * user explicitly retries them (see retryPermanentFailures) so they cannot loop forever.
+ */
 export async function getPendingQueue(): Promise<QueueItem[]> {
   const db = await getDatabase();
   return db.getAllAsync<QueueItem>(
     `SELECT * FROM ${TABLES.SYNC_QUEUE}
-     WHERE status IN ('PENDING', 'FAILED')
-     ORDER BY queued_at ASC` // FIFO — first recorded is first sent (FR18)
+     WHERE status = 'PENDING'
+        OR (status = 'FAILED' AND retry_count < ?)
+     ORDER BY queued_at ASC, queue_id ASC`, // FIFO — first recorded is first sent (FR18)
+    [MAX_SYNC_RETRIES]
   );
+}
+
+/**
+ * Crash recovery: SYNCING is only ever set while an upload is in flight. If the app was killed
+ * mid-upload those rows would stay SYNCING forever and never be sent again. Call this at the
+ * start of a sync cycle (the engine guarantees only one cycle runs at a time).
+ */
+export async function resetStuckSyncing(): Promise<void> {
+  const db = await getDatabase();
+  await db.runAsync(
+    `UPDATE ${TABLES.SYNC_QUEUE} SET status = 'PENDING' WHERE status = 'SYNCING'`
+  );
+}
+
+/**
+ * Net bottle change of every transaction the server has not confirmed yet for one product.
+ * Used to keep the displayed stock correct after pulling authoritative totals.
+ */
+export async function getPendingDeltaForProduct(productId: string): Promise<number> {
+  const db = await getDatabase();
+  const row = await db.getFirstAsync<{ delta: number | null }>(
+    `SELECT SUM(t.total_bottles_delta) AS delta
+     FROM ${TABLES.TRANSACTIONS} t
+     JOIN ${TABLES.SYNC_QUEUE} q ON q.transaction_uuid = t.uuid
+     WHERE t.product_id = ? AND q.status != 'SYNCED'`,
+    [productId]
+  );
+  return row?.delta ?? 0;
+}
+
+/** How many items gave up after MAX_SYNC_RETRIES and need a manual retry. */
+export async function getPermanentFailureCount(): Promise<number> {
+  const db = await getDatabase();
+  const row = await db.getFirstAsync<{ c: number }>(
+    `SELECT COUNT(*) AS c FROM ${TABLES.SYNC_QUEUE}
+     WHERE status = 'FAILED' AND retry_count >= ?`,
+    [MAX_SYNC_RETRIES]
+  );
+  return row?.c ?? 0;
+}
+
+/** Gives parked failures a fresh set of retries. Triggered by the user on the Sync screen. */
+export async function retryPermanentFailures(): Promise<number> {
+  const db = await getDatabase();
+  const result = await db.runAsync(
+    `UPDATE ${TABLES.SYNC_QUEUE}
+     SET status = 'PENDING', retry_count = 0
+     WHERE status = 'FAILED' AND retry_count >= ?`,
+    [MAX_SYNC_RETRIES]
+  );
+  return result.changes;
 }
 
 /** Returns all queue items for the full Sync Queue screen display. */

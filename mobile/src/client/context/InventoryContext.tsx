@@ -11,7 +11,6 @@ import {
   getAllActiveProducts,
   searchProducts,
   getLowStockProducts,
-  seedMockProductsIfEmpty,
 } from '../database/productRepo';
 import { useAuth } from './AuthContext';
 
@@ -51,8 +50,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
   async function initialLoad() {
     setIsLoading(true);
     try {
-      // Seed 5 realistic drinks so Phase 1 is immediately testable
-      await seedMockProductsIfEmpty();
+      // Catalog comes from the cloud via downstream sync (no fake seed data).
       await loadAll();
     } finally {
       setIsLoading(false);

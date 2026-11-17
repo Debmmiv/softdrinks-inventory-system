@@ -173,3 +173,92 @@ export async function resolveDiscrepancyApi(
   );
   return response.data;
 }
+
+// ---- Owner: product catalog (FR8, FR9, FR10) ------------------------------
+
+export interface CatalogProduct {
+  _id: string;
+  brand_name: string;
+  product_name: string;
+  bottle_size: string;
+  units_per_case: number;
+  reorder_threshold_bottles: number;
+  total_stock_bottles: number;
+  is_active: boolean;
+  updated_at: string;
+}
+
+export interface ProductFormPayload {
+  brand_name: string;
+  product_name: string;
+  bottle_size: string;
+  units_per_case: number;
+  reorder_threshold_bottles: number;
+}
+
+/** Owner view of the catalog, including deactivated products. */
+export async function fetchCatalogApi(): Promise<{ products: CatalogProduct[] }> {
+  const response = await apiClient.get<{ products: CatalogProduct[] }>('/products', {
+    params: { include_inactive: 'true' },
+  });
+  return response.data;
+}
+
+export async function createProductApi(
+  payload: ProductFormPayload
+): Promise<{ message: string; product: CatalogProduct }> {
+  const response = await apiClient.post<{ message: string; product: CatalogProduct }>('/products', payload);
+  return response.data;
+}
+
+export async function updateProductApi(
+  id: string,
+  payload: Partial<ProductFormPayload> & { is_active?: boolean }
+): Promise<{ message: string; product: CatalogProduct }> {
+  const response = await apiClient.patch<{ message: string; product: CatalogProduct }>(`/products/${id}`, payload);
+  return response.data;
+}
+
+// ---- Owner: reports (FR25, FR26) ------------------------------------------
+
+export interface ReplenishmentItem {
+  product_id: string;
+  brand_name: string;
+  product_name: string;
+  bottle_size: string;
+  units_per_case: number;
+  current_stock_bottles: number;
+  reorder_threshold_bottles: number;
+  deficit_bottles: number;
+  deficit_display: string;
+}
+
+export async function fetchReplenishmentApi(): Promise<{
+  total_items_to_replenish: number;
+  replenishment: ReplenishmentItem[];
+}> {
+  const response = await apiClient.get('/reports/replenishment');
+  return response.data;
+}
+
+export interface MovementRow {
+  product_id: string;
+  product_name: string;
+  units_per_case: number;
+  transaction_type: 'DELIVERY' | 'RELEASE' | 'ADJUSTMENT';
+  total_cases: number;
+  total_loose_bottles: number;
+  total_bottles_delta: number;
+  transaction_count: number;
+}
+
+export interface SummaryParams {
+  start_date?: string;
+  end_date?: string;
+  type?: 'DELIVERY' | 'RELEASE' | 'ADJUSTMENT';
+}
+
+export async function fetchSummaryApi(params: SummaryParams = {}): Promise<{ movements: MovementRow[] }> {
+  const response = await apiClient.get<{ movements: MovementRow[] }>('/reports/summary', { params });
+  return response.data;
+}

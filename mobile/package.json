@@ -8,14 +8,14 @@
     "axios": "^1.21.0",
     "bcryptjs": "^3.0.3",
     "dotenv": "^18.0.9",
-    "expo": "~58.0.25",
+    "expo": "~58.0.26",
     "expo-constants": "~58.0.15",
     "expo-crypto": "~58.0.8",
     "expo-font": "~58.0.11",
     "expo-linking": "~58.0.17",
-    "expo-router": "~58.0.31",
+    "expo-router": "~58.0.32",
     "expo-secure-store": "~58.0.3",
-    "expo-sqlite": "~58.0.17",
+    "expo-sqlite": "~58.0.18",
     "expo-status-bar": "~58.0.5",
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.11.4",
@@ -38,7 +38,8 @@
     "web": "expo start --web",
     "seed:admin": "tsx src/server/scripts/seedAdmin.ts",
     "enroll:staff": "tsx src/server/scripts/seedStaff.ts",
-    "test:api": "tsx src/server/scripts/testEndpoints.ts"
+    "test:api": "tsx src/server/scripts/testEndpoints.ts",
+    "test": "tsx --test src/server/services/txValidation.test.ts src/server/middleware/rateLimit.test.ts src/client/utils/calculations.test.ts"
   },
   "private": true
 }
