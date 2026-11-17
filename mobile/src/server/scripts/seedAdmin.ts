@@ -2,6 +2,7 @@ import readline from 'readline';
 import bcrypt from 'bcryptjs';
 import { connectToDatabase } from '../config/db';
 import { User } from '../models/User';
+import { validatePassword } from '../services/passwordPolicy';
 
 /**
  * FR1: Administrative Bootstrap CLI Script
@@ -47,9 +48,10 @@ async function run() {
       process.exit(1);
     }
 
-    const password = await prompt('Enter Secure Password (min 6 chars): ');
-    if (!password || password.length < 6) {
-      console.error('Error: Password must be at least 6 characters.');
+    const password = await prompt('Enter Secure Password: ');
+    const policy = validatePassword(password, username);
+    if (!policy.valid) {
+      console.error(`\nError: Password does not meet security requirements:\n - ${policy.errors.join('\n - ')}`);
       process.exit(1);
     }
 

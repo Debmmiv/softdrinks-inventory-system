@@ -3,6 +3,7 @@ import { connectToDatabase } from '../../../../server/config/db';
 import { User } from '../../../../server/models/User';
 import { authenticate, requireOwner } from '../../../../server/middleware/auth';
 import { jsonOk, jsonError } from '../../../../server/middleware/response';
+import { validatePassword } from '../../../../server/services/passwordPolicy';
 
 /**
  * POST /api/auth/admin/reset-password
@@ -23,10 +24,6 @@ export async function POST(req: Request): Promise<Response> {
 
     const { user_id, new_temporary_password } = body;
 
-    if (new_temporary_password.length < 6) {
-      return jsonError('Temporary password must be at least 6 characters.', 400);
-    }
-
     await connectToDatabase();
 
     const user = await User.findById(user_id);
@@ -34,11 +31,24 @@ export async function POST(req: Request): Promise<Response> {
       return jsonError('User account not found.', 404);
     }
 
+    // Security: Enforce strict password policy
+    const policy = validatePassword(new_temporary_password, user.username);
+    if (!policy.valid) {
+      return jsonError(
+        `Temporary password does not meet security requirements: ${policy.errors.join(', ')}`,
+        400,
+        policy.errors
+      );
+    }
+
     // token_version bump kicks the target out of any session opened with the old password.
     await User.updateOne(
       { _id: user._id },
       {
-        $set: { password_hash: await bcrypt.hash(new_temporary_password, 10) },
+        $set: {
+          password_hash: await bcrypt.hash(new_temporary_password, 10),
+          passwordUpdatedAt: new Date(),
+        },
         $inc: { token_version: 1 },
       }
     );

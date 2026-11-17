@@ -9,6 +9,7 @@ export interface IUser extends Document {
   /** Incremented to invalidate every JWT issued before the change (password reset, deactivation). */
   token_version: number;
   created_at: Date;
+  passwordUpdatedAt?: Date;
 }
 
 const UserSchema = new Schema<IUser>(
@@ -45,6 +46,10 @@ const UserSchema = new Schema<IUser>(
       default: 0,
     },
     created_at: {
+      type: Date,
+      default: Date.now,
+    },
+    passwordUpdatedAt: {
       type: Date,
       default: Date.now,
     },

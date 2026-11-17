@@ -22,6 +22,8 @@ export default function OwnerLayout() {
       }}
     >
       <Stack.Screen name="reports" options={{ title: 'Reports & Analytics' }} />
+      <Stack.Screen name="forecast" options={{ title: 'Demand Forecasting' }} />
+      <Stack.Screen name="backup" options={{ title: 'Backup & Export' }} />
       <Stack.Screen name="discrepancies" options={{ title: 'Stock Discrepancies' }} />
       <Stack.Screen name="products/index" options={{ title: 'Product Management' }} />
       <Stack.Screen name="users/index" options={{ title: 'User Management' }} />

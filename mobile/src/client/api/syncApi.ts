@@ -262,3 +262,74 @@ export async function fetchSummaryApi(params: SummaryParams = {}): Promise<{ mov
   const response = await apiClient.get<{ movements: MovementRow[] }>('/reports/summary', { params });
   return response.data;
 }
+
+// ---- Owner: demand forecast ------------------------------------------------
+
+export interface ForecastItem {
+  product_id: string;
+  brand_name: string;
+  product_name: string;
+  bottle_size: string;
+  units_per_case: number;
+  current_stock_bottles: number;
+  reorder_threshold_bottles: number;
+  avg_daily_bottles: number;
+  avg_daily_display: string;
+  total_released_bottles: number;
+  release_count: number;
+  days_until_stockout: number;
+  days_until_reorder: number;
+  reorder_date: string | null;
+  trend: 'rising' | 'falling' | 'stable' | 'no_data';
+  urgency: 'critical' | 'warning' | 'ok' | 'overstocked';
+  weekly_demand: number[];
+}
+
+export interface ForecastResponse {
+  lookback_days: number;
+  generated_at: string;
+  total_products: number;
+  critical_count: number;
+  warning_count: number;
+  forecasts: ForecastItem[];
+}
+
+export async function fetchForecastApi(lookbackDays = 30): Promise<ForecastResponse> {
+  const response = await apiClient.get<ForecastResponse>('/reports/forecast', {
+    params: { lookback_days: String(lookbackDays) },
+  });
+  return response.data;
+}
+
+// ---- Owner: backup & export ------------------------------------------------
+
+export interface BackupMeta {
+  version: string;
+  scope?: string;
+  generated_at: string;
+  generated_by: string;
+  record_counts: {
+    products: number;
+    transactions: number;
+    users: number;
+  };
+  total_records: number;
+}
+
+export interface BackupExportResponse {
+  meta: BackupMeta;
+  products: unknown[];
+  transactions: unknown[];
+  users: unknown[];
+}
+
+/** Fetches a JSON snapshot of cloud data. Owner only. */
+export async function fetchBackupExportApi(
+  scope: 'inventory' | 'recent' | 'all' = 'all',
+  limit = 1000
+): Promise<BackupExportResponse> {
+  const response = await apiClient.get<BackupExportResponse>('/backup/export', {
+    params: { scope, limit: String(limit) },
+  });
+  return response.data;
+}

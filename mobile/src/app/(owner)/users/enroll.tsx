@@ -15,6 +15,8 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { enrollUserApi } from '../../../client/api/syncApi';
 import { useSync } from '../../../client/context/SyncContext';
+import { validatePassword } from '../../../client/utils/passwordPolicy';
+import { PasswordStrengthMeter } from '../../../client/components/PasswordStrengthMeter';
 
 /**
  * In-App Staff Enrollment Screen (FR6, FR7, NFR7, NFR8)
@@ -49,8 +51,12 @@ export default function StaffEnrollmentScreen() {
       return;
     }
 
-    if (password.length < 6) {
-      Alert.alert('Weak Password', 'Initial temporary password must be at least 6 characters.');
+    const policy = validatePassword(password, username);
+    if (!policy.valid) {
+      Alert.alert(
+        'Weak Password',
+        `Password does not meet depot security requirements:\n\n• ${policy.errors.join('\n• ')}`
+      );
       return;
     }
 
@@ -146,12 +152,13 @@ export default function StaffEnrollmentScreen() {
           <Text style={styles.label}>TEMPORARY PASSWORD</Text>
           <TextInput
             style={styles.input}
-            placeholder="At least 6 characters (e.g. Staff123)"
+            placeholder="Min. 8 chars (upper, lower, num, symbol)"
             placeholderTextColor="#94A3B8"
             value={password}
             onChangeText={setPassword}
             editable={!submitting}
           />
+          <PasswordStrengthMeter password={password} username={username} />
 
           <Text style={styles.label}>ACCOUNT ROLE</Text>
           <View style={styles.roleSelector}>

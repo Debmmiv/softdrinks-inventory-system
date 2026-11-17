@@ -124,6 +124,24 @@ export default function DashboardScreen() {
         <QuickAction label="History" icon="time-outline" color="#7C3AED" onPress={() => navigation.navigate('history')} />
       </View>
 
+      {/* Owner: Demand Forecasting Banner */}
+      {user?.role === 'owner/manager' && (
+        <TouchableOpacity
+          style={styles.forecastBannerCard}
+          onPress={() => router.push('/(owner)/forecast' as any)}
+          activeOpacity={0.8}
+        >
+          <View style={styles.forecastIconWrap}>
+            <Ionicons name="trending-up" size={20} color="#2563EB" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.forecastBannerTitle}>Demand Forecasting</Text>
+            <Text style={styles.forecastBannerSub}>Predict daily consumption & stockout dates</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color="#2563EB" />
+        </TouchableOpacity>
+      )}
+
       {/* Real-time search bar (FR27) */}
       <View style={styles.searchBar}>
         <Ionicons name="search-outline" size={18} color="#94A3B8" />
@@ -212,6 +230,29 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   discrepancyText: { flex: 1, fontSize: 13, fontWeight: '600', color: '#B91C1C' },
+  forecastBannerCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: '#EFF6FF',
+    borderColor: '#BFDBFE',
+    borderWidth: 1,
+    marginHorizontal: 16,
+    marginBottom: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+  forecastIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#DBEAFE',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  forecastBannerTitle: { fontSize: 13, fontWeight: '700', color: '#1E40AF' },
+  forecastBannerSub: { fontSize: 11, color: '#3B82F6', marginTop: 1 },
   headerRow: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8,

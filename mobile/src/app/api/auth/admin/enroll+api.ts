@@ -3,6 +3,7 @@ import { connectToDatabase } from '../../../../server/config/db';
 import { User } from '../../../../server/models/User';
 import { authenticate, requireOwner } from '../../../../server/middleware/auth';
 import { jsonOk, jsonError } from '../../../../server/middleware/response';
+import { validatePassword } from '../../../../server/services/passwordPolicy';
 
 /**
  * POST /api/auth/admin/enroll
@@ -23,8 +24,14 @@ export async function POST(req: Request): Promise<Response> {
 
     const { username, full_name, initial_password, role = 'staff' } = body;
 
-    if (initial_password.length < 6) {
-      return jsonError('Initial password must be at least 6 characters.', 400);
+    // Security: Enforce strict password policy
+    const policy = validatePassword(initial_password, username);
+    if (!policy.valid) {
+      return jsonError(
+        `Initial password does not meet security requirements: ${policy.errors.join(', ')}`,
+        400,
+        policy.errors
+      );
     }
 
     if (!['staff', 'owner/manager'].includes(role)) {
@@ -47,6 +54,7 @@ export async function POST(req: Request): Promise<Response> {
       role,
       is_active: true,
       created_at: new Date(),
+      passwordUpdatedAt: new Date(),
     });
 
     await newUser.save();

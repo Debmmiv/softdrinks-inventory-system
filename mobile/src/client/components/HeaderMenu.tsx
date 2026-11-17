@@ -29,6 +29,8 @@ const STANDARD_MENU_ITEMS: MenuItem[] = [
 ];
 
 const OWNER_MENU_ITEMS: MenuItem[] = [
+  { label: 'Demand Forecasting', path: '/(owner)/forecast', icon: 'trending-up-outline' },
+  { label: 'Backup & Export', path: '/(owner)/backup', icon: 'cloud-download-outline' },
   { label: 'Reports & Deficits', path: '/(owner)/reports', icon: 'analytics-outline' },
   { label: 'Stock Discrepancies', path: '/(owner)/discrepancies', icon: 'warning-outline' },
   { label: 'Product Management', path: '/(owner)/products', icon: 'cube-outline' },

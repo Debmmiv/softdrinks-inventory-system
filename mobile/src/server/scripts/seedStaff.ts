@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { connectToDatabase } from '../config/db';
 import { User } from '../models/User';
+import { validatePassword } from '../services/passwordPolicy';
 
 dotenv.config();
 dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
@@ -44,9 +45,10 @@ async function run() {
       process.exit(1);
     }
 
-    const password = await prompt('Enter Temporary Password (min 6 chars): ');
-    if (!password || password.length < 6) {
-      console.error('Error: Password must be at least 6 characters.');
+    const password = await prompt('Enter Temporary Password: ');
+    const policy = validatePassword(password, username);
+    if (!policy.valid) {
+      console.error(`\nError: Password does not meet security requirements:\n - ${policy.errors.join('\n - ')}`);
       process.exit(1);
     }
 

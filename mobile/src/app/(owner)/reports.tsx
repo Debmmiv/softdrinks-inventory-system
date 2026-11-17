@@ -8,7 +8,7 @@ import {
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import {
   fetchReplenishmentApi,
@@ -76,6 +76,7 @@ function signedStock(row: MovementRow): string {
 }
 
 export default function ReportsScreen() {
+  const router = useRouter();
   const { isOnline } = useSync();
 
   const [range, setRange] = useState<Range>('7d');
@@ -149,6 +150,22 @@ export default function ReportsScreen() {
         </View>
       )}
       {error && <Text style={styles.errorText}>{error}</Text>}
+
+      {/* Demand Forecasting Shortcut */}
+      <TouchableOpacity
+        style={styles.forecastCard}
+        onPress={() => router.push('/(owner)/forecast')}
+        activeOpacity={0.7}
+      >
+        <View style={styles.forecastIconBg}>
+          <Ionicons name="trending-up" size={20} color="#2563EB" />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.forecastTitle}>Demand Forecasting</Text>
+          <Text style={styles.forecastSubtitle}>Predict daily consumption & stockout dates</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
+      </TouchableOpacity>
 
       <Text style={styles.sectionTitle}>REPLENISHMENT ALERTS</Text>
       {loading ? (
@@ -243,6 +260,32 @@ const styles = StyleSheet.create({
   },
   offlineText: { flex: 1, fontSize: 12, color: '#92400E' },
   errorText: { color: '#DC2626', fontSize: 13, marginBottom: 10 },
+  forecastCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: '#fff',
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    shadowColor: '#2563EB',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  forecastIconBg: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#EFF6FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  forecastTitle: { fontSize: 14, fontWeight: '700', color: '#0F172A' },
+  forecastSubtitle: { fontSize: 12, color: '#64748B', marginTop: 2 },
   sectionTitle: { fontSize: 11, fontWeight: '700', color: '#64748B', letterSpacing: 1, marginBottom: 10 },
   okCard: {
     flexDirection: 'row',

@@ -21,6 +21,8 @@ import {
 } from '../../../client/api/syncApi';
 import { useAuth } from '../../../client/context/AuthContext';
 import { useSync } from '../../../client/context/SyncContext';
+import { validatePassword } from '../../../client/utils/passwordPolicy';
+import { PasswordStrengthMeter } from '../../../client/components/PasswordStrengthMeter';
 
 /**
  * Owner User Management Screen (FR6, FR7, FR29, NFR7, NFR8)
@@ -108,8 +110,13 @@ export default function UserManagementScreen() {
 
   async function handleResetPassword() {
     if (!targetUser) return;
-    if (newTempPassword.length < 6) {
-      Alert.alert('Password Length', 'Temporary password must be at least 6 characters.');
+    
+    const policy = validatePassword(newTempPassword, targetUser.username);
+    if (!policy.valid) {
+      Alert.alert(
+        'Weak Password',
+        `Temporary password does not meet security requirements:\n\n• ${policy.errors.join('\n• ')}`
+      );
       return;
     }
 
@@ -193,17 +200,18 @@ export default function UserManagementScreen() {
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Reset Staff Password</Text>
             <Text style={styles.modalSubtitle}>
-              Set a temporary password for {targetUser?.full_name} (@{targetUser?.username}).
+              Set a new temporary password for {targetUser?.full_name} (@{targetUser?.username}). Must follow depot password policy.
             </Text>
 
             <TextInput
               style={styles.modalInput}
-              placeholder="New temporary password (min 6 chars)"
+              placeholder="New temporary password (min. 8 characters)"
               placeholderTextColor="#94A3B8"
               value={newTempPassword}
               onChangeText={setNewTempPassword}
               editable={!resetting}
             />
+            <PasswordStrengthMeter password={newTempPassword} username={targetUser?.username} />
 
             <View style={styles.modalButtons}>
               <TouchableOpacity

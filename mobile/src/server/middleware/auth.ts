@@ -12,6 +12,7 @@ export interface AuthUser {
 /** Shape of the claims we put inside the JWT. `tv` is the user's token_version at signing time. */
 interface TokenPayload extends AuthUser {
   tv?: number;
+  iat?: number;
 }
 
 /** Default session length. Override with JWT_EXPIRES_IN (e.g. "12h", "7d"). */
@@ -45,7 +46,7 @@ export function signToken(user: AuthUser, tokenVersion = 0): string {
 /**
  * Verifies the Bearer token AND re-checks the account in MongoDB on every request:
  *   - the account must still exist and be active,
- *   - the token_version must match (password reset / deactivation revokes old tokens),
+ *   - the token_version and passwordUpdatedAt must match (password reset / deactivation revokes old tokens),
  *   - the role is taken from the database, never from the token, so a demotion is immediate.
  *
  * Tokens issued before token_version existed carry no `tv` claim and are treated as version 0,
@@ -83,7 +84,7 @@ export async function authenticate(
   try {
     await connectToDatabase();
     const record = await User.findById(decoded.id)
-      .select('username role is_active token_version')
+      .select('username role is_active token_version passwordUpdatedAt')
       .lean();
 
     if (!record) {
@@ -96,6 +97,14 @@ export async function authenticate(
       return {
         errorResponse: jsonError('Session is no longer valid. Please log in again.', 401),
       };
+    }
+    if (record.passwordUpdatedAt && decoded.iat) {
+      const passwordChangedSec = Math.floor(new Date(record.passwordUpdatedAt).getTime() / 1000);
+      if (decoded.iat < passwordChangedSec) {
+        return {
+          errorResponse: jsonError('Session expired due to password change. Please log in again.', 401),
+        };
+      }
     }
 
     return {

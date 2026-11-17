@@ -20,6 +20,8 @@ import { useSync } from '../../client/context/SyncContext';
 import { changePasswordApi } from '../../client/api/syncApi';
 import { getDatabase } from '../../client/database/db';
 import { TABLES, STORAGE_KEYS } from '../../client/utils/constants';
+import { validatePassword } from '../../client/utils/passwordPolicy';
+import { PasswordStrengthMeter } from '../../client/components/PasswordStrengthMeter';
 
 /**
  * Settings / Profile Screen (FR5, FR28, NFR7, NFR8, NFR12)
@@ -69,8 +71,17 @@ export default function SettingsScreen() {
       return;
     }
 
-    if (newPassword.length < 6) {
-      Alert.alert('Password Length', 'New password must be at least 6 characters long.');
+    if (currentPassword === newPassword) {
+      Alert.alert('Invalid Password', 'New password cannot be the same as your current password.');
+      return;
+    }
+
+    const policy = validatePassword(newPassword, user?.username);
+    if (!policy.valid) {
+      Alert.alert(
+        'Weak Password',
+        `Password does not meet depot security requirements:\n\n• ${policy.errors.join('\n• ')}`
+      );
       return;
     }
 
@@ -146,6 +157,26 @@ export default function SettingsScreen() {
           <Text style={styles.sectionTitle}>OWNER CONTROLS</Text>
           <TouchableOpacity
             style={styles.actionBtn}
+            onPress={() => router.push('/(owner)/forecast')}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="trending-up-outline" size={20} color="#2563EB" />
+            <Text style={styles.actionText}>Demand Forecasting</Text>
+            <Ionicons name="chevron-forward" size={16} color="#CBD5E1" />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.actionBtn, { borderTopWidth: 1, borderTopColor: '#F1F5F9' }]}
+            onPress={() => router.push('/(owner)/backup' as any)}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="cloud-download-outline" size={20} color="#2563EB" />
+            <Text style={styles.actionText}>Backup & Export Data</Text>
+            <Ionicons name="chevron-forward" size={16} color="#CBD5E1" />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.actionBtn, { borderTopWidth: 1, borderTopColor: '#F1F5F9' }]}
             onPress={() => router.push('/(owner)/users')}
             activeOpacity={0.7}
           >
@@ -201,7 +232,7 @@ export default function SettingsScreen() {
             </View>
 
             <Text style={styles.modalSubtitle}>
-              Enter your current password and choose a new password of at least 6 characters.
+              Choose a strong new password that follows depot security policy (min. 8 characters with uppercase, lowercase, number, and symbol).
             </Text>
 
             <TextInput
@@ -216,13 +247,14 @@ export default function SettingsScreen() {
 
             <TextInput
               style={styles.input}
-              placeholder="New Password (min. 6 characters)"
+              placeholder="New Password (min. 8 characters)"
               placeholderTextColor="#94A3B8"
               secureTextEntry
               value={newPassword}
               onChangeText={setNewPassword}
               editable={!updating}
             />
+            <PasswordStrengthMeter password={newPassword} username={user?.username} />
 
             <TextInput
               style={styles.input}
